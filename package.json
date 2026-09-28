@@ -1,0 +1,16 @@
+{
+  "name": "profecian-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "customer": "npm run web --workspace @profecian/customer",
+    "vendor": "npm run web --workspace @profecian/vendor",
+    "admin": "npm run web --workspace @profecian/admin",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  }
+}

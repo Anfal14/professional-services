@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Profecian Partner",
+    "slug": "profecian-partner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "profecian-partner",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.profecian.partner"
+    },
+    "android": {
+      "package": "com.profecian.partner",
+      "adaptiveIcon": {
+        "backgroundColor": "#6E42E5",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "Profecian Partner",
+      "themeColor": "#6E42E5"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-image",
+      "expo-font"
+    ],
+    "experiments": {
+      "autolinkingModuleResolution": true
+    }
+  }
+}

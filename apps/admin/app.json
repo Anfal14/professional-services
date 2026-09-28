@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Profecian Admin",
+    "slug": "profecian-admin",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "profecian-admin",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.profecian.admin"
+    },
+    "android": {
+      "package": "com.profecian.admin",
+      "adaptiveIcon": {
+        "backgroundColor": "#6E42E5",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "Profecian Admin",
+      "themeColor": "#6E42E5"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-image",
+      "expo-font"
+    ],
+    "experiments": {
+      "autolinkingModuleResolution": true
+    }
+  }
+}

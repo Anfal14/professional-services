@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Profecian",
+    "slug": "Profecian",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.profecian.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#6E42E5",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.profecian.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "Profecian – Home Services",
+      "themeColor": "#6E42E5"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-image",
+      "expo-font",
+      "@react-native-community/datetimepicker"
+    ],
+    "scheme": "profecian",
+    "experiments": {
+      "autolinkingModuleResolution": true
+    }
+  }
+}
