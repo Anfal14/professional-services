@@ -1,11 +1,11 @@
 import type { WebPressableState } from '@/types';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
-import { Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { IconName } from '@/data/services';
 import { useResponsive } from '@/hooks/useResponsive';
-import { colors, fonts, radius, shadows, spacing } from '@/theme';
+import { colors, fonts, radius, shadows, spacing, createStyles } from '@/theme';
 import { AppText } from '../AppText';
 import { FieldShell } from './FieldShell';
 
@@ -127,7 +127,7 @@ export function SelectField({ label, value, options, onChange, placeholder = 'Se
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   box: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   focused: { borderColor: colors.primary },
-  errored: { borderColor: colors.danger, backgroundColor: '#FFFBFB' },
+  errored: { borderColor: colors.danger, backgroundColor: colors.inputErrorBg },
   value: { flex: 1, fontFamily: fonts.medium, fontSize: 15, color: colors.ink },
   placeholder: { color: colors.subtle },
   metaInline: { fontFamily: fonts.bold, fontSize: 14, color: colors.primary },
@@ -164,8 +164,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   optionHover: { backgroundColor: colors.surfaceAlt },
-  optionActive: { borderColor: colors.primary, backgroundColor: '#FBF9FF' },
+  optionActive: { borderColor: colors.primary, backgroundColor: colors.selectedBg },
   optIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   optLabel: { fontFamily: fonts.semibold, fontSize: 15, color: colors.ink },
   optMeta: { fontFamily: fonts.bold, fontSize: 14, color: colors.ink },
-});
+}));

@@ -9,7 +9,7 @@ import {
   type BookingEvent,
 } from '@profecian/shared';
 import { AppText, asIcon, FieldShell, PressableScale, type WebPressableState } from './primitives';
-import { colors, fonts, radius, shadows, spacing } from './theme';
+import { colors, fonts, radius, shadows, spacing, createStyles } from './theme';
 
 /* ───────────── Rating ───────────── */
 
@@ -208,7 +208,7 @@ export function DateSlotPicker({ date, slot, onDate, onSlot, days = 10, dateErro
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   photos: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   photo: { width: 76, height: 76, borderRadius: radius.md, overflow: 'hidden', backgroundColor: colors.background },
@@ -238,4 +238,4 @@ const styles = StyleSheet.create({
   slot: { minWidth: 96, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
   slotOff: { opacity: 0.45, backgroundColor: colors.background },
   slotText: { fontFamily: fonts.semibold, fontSize: 13.5, color: colors.ink },
-});
+}));

@@ -1,3 +1,4 @@
+import { bookingProblemLabel } from './pricing';
 import { formatDate, formatINR } from './format';
 import { whatsappLink } from './providers';
 import type { AppNotification, Booking, Channel, Database, NotificationKind, Vendor } from './types';
@@ -31,8 +32,7 @@ export function makeNotification(input: NotifyInput): AppNotification {
 
 const names = (db: Database, b: Booking) => {
   const cat = db.categories.find((c) => c.id === b.categoryId);
-  const prob = db.problemTypes.find((p) => p.id === b.problemTypeId);
-  return { service: cat?.name ?? 'Service', problem: prob?.name ?? '' };
+  return { service: cat?.name ?? 'Service', problem: bookingProblemLabel(db, b) };
 };
 
 /** WhatsApp booking acknowledgement sent to the customer right after booking. */

@@ -7,7 +7,8 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BackendProvider } from '@profecian/shared';
-import { colors } from '@profecian/ui';
+import { colors, ThemeProvider, useTheme } from '@profecian/ui';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { backend } from '@/backend';
 
 const Loading = () => (
@@ -25,13 +26,20 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <BackendProvider backend={backend} fallback={<Loading />}>
-        <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: colors.background } }}>
-          <Stack.Screen name="index" options={{ animation: 'none' }} />
-          <Stack.Screen name="login" options={{ animation: 'fade' }} />
-          <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-        </Stack>
+        <ThemeProvider storage={AsyncStorage} storageKey="@profecian/vendor/theme/v1" fallback={<Loading />}>
+          <ThemedStatusBar />
+          <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: colors.background } }}>
+            <Stack.Screen name="index" options={{ animation: 'none' }} />
+            <Stack.Screen name="login" options={{ animation: 'fade' }} />
+            <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+          </Stack>
+        </ThemeProvider>
       </BackendProvider>
     </SafeAreaProvider>
   );
+}
+
+function ThemedStatusBar() {
+  const { scheme } = useTheme();
+  return <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />;
 }

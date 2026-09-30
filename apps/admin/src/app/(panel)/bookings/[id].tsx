@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Linking, View } from 'react-native';
 import { Image } from 'expo-image';
 import {
-  BOOKING_STATUS, formatDate, formatDateTime, formatINR, formatPhone, mapsUrl, PAYMENT_METHOD_LABEL, PAYMENT_STATUS, PRICING_MODEL_LABEL,
+  BOOKING_STATUS, bookingProblemNames, formatDate, formatDateTime, formatINR, formatPhone, mapsUrl, PAYMENT_METHOD_LABEL, PAYMENT_STATUS, PRICING_MODEL_LABEL,
   useAction, useBackend, type BookingStatus,
 } from '@profecian/shared';
 import {
@@ -61,7 +61,7 @@ export default function BookingDetail() {
         <View style={{ gap: spacing.lg }}>
           <Panel title="Service">
             <KeyValue label="Category" value={cat?.name ?? '—'} />
-            <KeyValue label="Problem type" value={prob?.name ?? '—'} />
+            <KeyValue label={(b.items?.length ?? 1) > 1 ? 'Problems' : 'Problem type'} value={bookingProblemNames(db, b).join(', ') || '—'} />
             <KeyValue label="Pricing model" value={prob ? PRICING_MODEL_LABEL[prob.pricingModel] : '—'} />
             <KeyValue label="Scheduled" value={`${formatDate(b.date)}, ${b.slot}`} />
             {b.notes ? <KeyValue label="Customer notes" value={b.notes} /> : null}

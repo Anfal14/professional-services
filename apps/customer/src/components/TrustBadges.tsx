@@ -1,8 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 import type { IconName } from "@/data/services";
 import { useResponsive } from "@/hooks/useResponsive";
-import { colors, fonts, radius } from "@/theme";
+import { colors, fonts, radius, createStyles } from "@/theme";
 import { AppText } from "./AppText";
 
 const BADGES: { icon: IconName; label: string; short: string }[] = [
@@ -33,7 +33,7 @@ export function TrustBadges({ dark }: TrustBadgesProps) {
           <Ionicons
             name={b.icon}
             size={15}
-            color={dark ? "#C9B8FF" : colors.primary}
+            color={dark ? colors.accentTint : colors.primary}
           />
           <AppText
             style={[styles.text, { color: dark ? colors.white : colors.ink }]}
@@ -46,7 +46,7 @@ export function TrustBadges({ dark }: TrustBadgesProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   row: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   badge: {
     flexDirection: "row",
@@ -63,4 +63,4 @@ const styles = StyleSheet.create({
   },
   badgeLight: { backgroundColor: colors.surface, borderColor: colors.border },
   text: { fontFamily: fonts.semibold, fontSize: 12.5 },
-});
+}));

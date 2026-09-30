@@ -1,5 +1,7 @@
 # Location (mock, on-device)
 
+> **Superseded 2026-09-29** — location is now city / current location / saved address; see `platform-customer.md` (Location).
+
 ## Purpose
 Let the user pick which city they're booking in, shown as a pill in the navbar. No geolocation or backend yet — a fixed city list, persisted on-device.
 

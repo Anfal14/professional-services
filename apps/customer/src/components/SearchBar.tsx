@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, fonts, radius, shadows } from '@/theme';
+import { Pressable, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import { colors, fonts, radius, shadows, createStyles } from '@/theme';
 import { Button } from './Button';
 
 interface SearchBarProps {
@@ -55,7 +55,7 @@ export function SearchBar({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -92,4 +92,4 @@ const styles = StyleSheet.create({
   inputCompact: { fontSize: 13, paddingVertical: 8 },
   clear: { paddingHorizontal: 8 },
   button: { marginLeft: 4 },
-});
+}));

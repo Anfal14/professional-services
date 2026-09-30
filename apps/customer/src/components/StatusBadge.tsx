@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { BOOKING_STATUS, type BookingStatus } from '@profecian/shared';
 import { toneColors } from '@profecian/ui';
 import type { IconName } from '@/data/services';
-import { fonts, radius } from '@/theme';
+import { fonts, radius, createStyles } from '@/theme';
 import { AppText } from './AppText';
 
 /** Customer-facing wording for statuses whose shared label is ops-oriented. */
@@ -24,7 +24,7 @@ export function StatusBadge({ status }: { status: BookingStatus }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -35,4 +35,4 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   text: { fontFamily: fonts.bold, fontSize: 12 },
-});
+}));

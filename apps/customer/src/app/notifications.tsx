@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect, router } from 'expo-router';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
 import { timeAgo, useBackend, useDb } from '@profecian/shared';
 import { Badge, Button as UiButton, Card } from '@profecian/ui';
 import { AppText } from '@/components/AppText';
@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Screen } from '@/components/Screen';
 import { useCustomer } from '@/backend';
 import type { IconName } from '@/data/services';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, createStyles } from '@/theme';
 
 const ICON: Record<string, IconName> = {
   booking_confirmed: 'checkmark-circle-outline',
@@ -51,7 +51,7 @@ export default function Notifications() {
                   backend.customer.markNotificationsRead(customer.id, [n.id]);
                   if (n.bookingId) router.push(`/booking/${n.bookingId}`);
                 }}
-                style={[styles.item, i > 0 && styles.itemBorder, !n.read && { backgroundColor: '#FBF9FF' }]}
+                style={[styles.item, i > 0 && styles.itemBorder, !n.read && { backgroundColor: colors.selectedBg }]}
               >
                 <View style={styles.icon}>
                   <Ionicons name={ICON[n.kind] ?? 'notifications-outline'} size={18} color={colors.primary} />
@@ -80,10 +80,10 @@ export default function Notifications() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   page: { paddingTop: spacing.xxl, gap: spacing.xl, maxWidth: 760 },
   head: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md, flexWrap: 'wrap' },
   item: { flexDirection: 'row', gap: spacing.md, padding: spacing.lg },
   itemBorder: { borderTopWidth: 1, borderTopColor: colors.border },
   icon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
-});
+}));

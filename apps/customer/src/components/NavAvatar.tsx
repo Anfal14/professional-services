@@ -3,12 +3,12 @@ import type { WebPressableState } from '@/types';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatPhone, useDb } from '@profecian/shared';
 import { useAuth } from '@/context/AuthContext';
 import { useResponsive } from '@/hooks/useResponsive';
-import { colors, fonts, layout, radius, shadows, spacing } from '@/theme';
+import { colors, fonts, layout, radius, shadows, spacing, createStyles } from '@/theme';
 import { AppText } from './AppText';
 import { PressableScale } from './PressableScale';
 
@@ -60,7 +60,7 @@ export function NavAvatar({ variant = 'circle' }: { variant?: 'circle' | 'tab' }
 
   const onPress = () => (user ? setOpen(true) : router.push('/login'));
   const close = () => setOpen(false);
-  const goTo = (href: '/account' | '/bookings' | '/notifications') => {
+  const goTo = (href: '/account' | '/bookings' | '/notifications' | '/settings') => {
     close();
     router.push(href);
   };
@@ -112,6 +112,7 @@ export function NavAvatar({ variant = 'circle' }: { variant?: 'circle' | 'tab' }
                 <MenuItem icon="person-circle-outline" label="Account" onPress={() => goTo('/account')} />
                 <MenuItem icon="calendar-outline" label="My Bookings" onPress={() => goTo('/bookings')} />
                 <MenuItem icon="notifications-outline" label="Notifications" badge={unread} onPress={() => goTo('/notifications')} />
+                <MenuItem icon="settings-outline" label="Settings" onPress={() => goTo('/settings')} />
                 <View style={styles.menuDivider} />
                 <MenuItem icon="log-out-outline" label="Logout" onPress={doLogout} danger />
               </View>
@@ -123,11 +124,11 @@ export function NavAvatar({ variant = 'circle' }: { variant?: 'circle' | 'tab' }
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   avatar: { width: 40, height: 40, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   avatarActive: { backgroundColor: colors.primarySoft },
   initials: { fontFamily: fonts.bold, fontSize: 14, color: colors.primary },
-  dot: { position: 'absolute', top: 2, right: 2, width: 10, height: 10, borderRadius: 5, backgroundColor: colors.danger, borderWidth: 2, borderColor: colors.white },
+  dot: { position: 'absolute', top: 2, right: 2, width: 10, height: 10, borderRadius: 5, backgroundColor: colors.danger, borderWidth: 2, borderColor: colors.surface },
   tab: { flex: 1, alignItems: 'center', gap: 2 },
   tabPill: { width: 52, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   tabInitials: { fontFamily: fonts.bold, fontSize: 15, color: colors.primary },
@@ -149,4 +150,4 @@ const styles = StyleSheet.create({
   menuItemText: { flex: 1, fontFamily: fonts.semibold, fontSize: 15, color: colors.ink },
   badge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontFamily: fonts.bold, fontSize: 11, color: colors.white },
-});
+}));

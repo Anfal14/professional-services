@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ActivityIndicator, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { IconName } from '@/data/services';
-import { colors, fonts, gradients, radius, shadows } from '@/theme';
+import { colors, fonts, gradients, radius, shadows, createStyles } from '@/theme';
 import { AppText } from './AppText';
 import { PressableScale } from './PressableScale';
 
@@ -29,15 +29,15 @@ const sizeStyles: Record<Size, { height: number; px: number; font: number; icon:
   lg: { height: 56, px: 24, font: 16, icon: 20 },
 };
 
-const palette: Record<Variant, { bg: string; fg: string; border?: string }> = {
+const palette = (): Record<Variant, { bg: string; fg: string; border?: string }> => ({
   primary: { bg: colors.primary, fg: colors.white },
   secondary: { bg: colors.primarySoft, fg: colors.primary },
   outline: { bg: 'transparent', fg: colors.ink, border: colors.borderStrong },
   ghost: { bg: 'transparent', fg: colors.primary },
   whatsapp: { bg: colors.whatsapp, fg: colors.white },
-  dark: { bg: colors.ink, fg: colors.white },
-  light: { bg: colors.white, fg: colors.ink },
-};
+  dark: { bg: colors.ink, fg: colors.inverse },
+  light: { bg: colors.white, fg: colors.night },
+});
 
 export function Button({
   label,
@@ -53,7 +53,7 @@ export function Button({
   accessibilityHint,
 }: ButtonProps) {
   const s = sizeStyles[size];
-  const p = palette[variant];
+  const p = palette()[variant];
   const inactive = disabled || loading;
 
   const content = (
@@ -101,10 +101,10 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   base: { borderRadius: radius.md, overflow: 'hidden', alignSelf: 'flex-start' },
   gradient: { borderRadius: radius.md },
   inner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   full: { alignSelf: 'stretch' },
   disabled: { opacity: 0.55 },
-});
+}));

@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useMemo, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, View } from 'react-native';
 import type { WebPressableState } from '@/types';
-import { colors, fonts, radius, shadows, spacing } from '@/theme';
+import { colors, fonts, radius, shadows, spacing, createStyles } from '@/theme';
 import { formatDate, parseISODate, toISODate, upcomingDays, BOOKING_WINDOW_DAYS } from '@/utils/format';
 import { AppText } from '../AppText';
 import { Button } from '../Button';
@@ -137,7 +137,7 @@ export function DateSelector({ value, onChange, error, days = BOOKING_WINDOW_DAY
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   row: { gap: 10, paddingVertical: 2, paddingRight: 4 },
   chip: {
     width: 68,
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   boxHover: { borderColor: colors.primary },
-  boxError: { borderColor: colors.danger, backgroundColor: '#FFFBFB' },
+  boxError: { borderColor: colors.danger, backgroundColor: colors.inputErrorBg },
   boxValue: { flex: 1, fontFamily: fonts.medium, fontSize: 15, color: colors.ink },
   boxPlaceholder: { color: colors.subtle },
   backdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', alignItems: 'center', padding: spacing.xxl },
@@ -181,4 +181,4 @@ const styles = StyleSheet.create({
   },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sheetClose: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
-});
+}));

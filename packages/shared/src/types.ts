@@ -183,6 +183,13 @@ export interface BookingEvent {
   note?: string;
 }
 
+/** One problem fixed during a visit. A cart checkout can put several in one booking. */
+export interface BookingItem {
+  problemTypeId: ID;
+  name: string;
+  price: number;
+}
+
 export interface Booking {
   id: ID;
   /** Human-readable, e.g. "PF7K2Q" */
@@ -191,7 +198,9 @@ export interface Booking {
   customerName: string;
   customerPhone: string;
   categoryId: ID;
+  /** The first (primary) problem; `items` lists every problem in the visit. */
   problemTypeId: ID;
+  items?: BookingItem[];
   /** yyyy-mm-dd */
   date: string;
   /** "10:00 AM" */

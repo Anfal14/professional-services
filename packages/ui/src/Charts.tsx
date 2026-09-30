@@ -6,10 +6,10 @@
  * Text always uses text tokens, never the series colour.
  */
 import { useState } from 'react';
-import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { Pressable, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 import { AppText } from './primitives';
-import { chartColors, colors, fonts, radius, shadows } from './theme';
+import { chartColors, colors, fonts, radius, shadows, createStyles } from './theme';
 
 export interface Datum {
   label: string;
@@ -212,7 +212,7 @@ export function BarList({ data, format = (n) => `${n}`, color = chartColors[0], 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   tick: { position: 'absolute', left: 0, textAlign: 'right', fontFamily: fonts.medium, fontSize: 11, color: colors.subtle },
   xLabel: { position: 'absolute', width: 40, textAlign: 'center', fontFamily: fonts.medium, fontSize: 10.5, color: colors.subtle },
   tip: { position: 'absolute', backgroundColor: colors.surface, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: colors.border, ...shadows.md },
@@ -220,4 +220,4 @@ const styles = StyleSheet.create({
   barHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   track: { height: 8, borderRadius: 4, backgroundColor: colors.background, overflow: 'hidden' },
   fill: { height: 8, borderRadius: 4 },
-});
+}));

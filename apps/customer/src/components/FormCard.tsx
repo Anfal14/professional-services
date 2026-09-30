@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import type { ReactNode } from 'react';
 import type { IconName } from '@/data/services';
-import { colors, radius, shadows, spacing } from '@/theme';
+import { colors, radius, shadows, spacing, createStyles } from '@/theme';
 import { AppText } from './AppText';
 
 interface FormCardProps {
@@ -26,7 +26,7 @@ export function FormCard({ title, icon, children }: FormCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
@@ -39,4 +39,4 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   icon: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   body: { gap: spacing.xl },
-});
+}));

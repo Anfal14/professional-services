@@ -22,12 +22,12 @@ import {
   useCatalog,
   type IconName,
 } from "@/data/services";
-import { formatDate, formatINR } from "@profecian/shared";
+import { bookingProblemLabel, formatDate, formatINR, useDb } from "@profecian/shared";
 import { Card } from "@profecian/ui";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useBookings } from "@/context/BookingsContext";
 import { useResponsive } from "@/hooks/useResponsive";
-import { colors, fonts, gradients, radius, shadows, spacing } from "@/theme";
+import { accentShade, colors, fonts, gradients, radius, shadows, spacing, createStyles } from "@/theme";
 import { openWhatsApp } from "@/utils/whatsapp";
 
 const STEPS: RoadmapStep[] = [
@@ -75,6 +75,7 @@ export default function HomeScreen() {
   const { isMobile, isDesktop, select, gutter } = useResponsive();
   const { services } = useCatalog();
   const { bookings } = useBookings();
+  const db = useDb();
   const recent = bookings.slice(0, isMobile ? 2 : 3);
   /** Four service photos shown as a clean 2×2 grid on the hero (desktop only). */
   const heroPreviewServices = services.slice(0, 4);
@@ -106,7 +107,7 @@ export default function HomeScreen() {
         <LinearGradient
           colors={
             isMobile
-              ? ["rgba(40,16,110,0.62)", "rgba(15,15,26,0.86)"]
+              ? [accentShade(0.62), "rgba(15,15,26,0.86)"] as const
               : gradients.heroSide
           }
           start={isMobile ? { x: 0, y: 0 } : { x: 0, y: 0.5 }}
@@ -223,7 +224,7 @@ export default function HomeScreen() {
                     <StatusBadge status={b.status} />
                   </View>
                   <AppText variant="small" numberOfLines={1}>
-                    {svc?.issues.find((i) => i.id === b.problemTypeId)?.title} · {formatDate(b.date)}, {b.slot}
+                    {bookingProblemLabel(db, b)} · {formatDate(b.date)}, {b.slot}
                   </AppText>
                   <AppText variant="label">{formatINR(b.price.total)} · #{b.code}</AppText>
                 </Card>
@@ -405,12 +406,12 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   row: { flexDirection: "row", alignItems: "center", gap: 10 },
   hero: {
     justifyContent: "center",
     overflow: "hidden",
-    backgroundColor: colors.ink,
+    backgroundColor: colors.night,
   },
   heroInner: { paddingTop: spacing.huge, paddingBottom: 72 },
   heroInnerMobile: { paddingTop: spacing.xl, paddingBottom: spacing.xxl },
@@ -444,7 +445,7 @@ const styles = StyleSheet.create({
     color: colors.white,
     letterSpacing: -1.2,
   },
-  heroAccent: { color: "#C9B8FF" },
+  heroAccent: { color: colors.accentTint },
   heroSub: {
     fontFamily: fonts.regular,
     fontSize: 16,
@@ -573,4 +574,4 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "rgba(255,255,255,0.85)",
   },
-});
+}));

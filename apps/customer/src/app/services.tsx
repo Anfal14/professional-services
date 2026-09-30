@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { AppText } from '@/components/AppText';
 import { Container } from '@/components/Container';
 import { EmptyState } from '@/components/EmptyState';
@@ -12,7 +12,7 @@ import { ServiceCard } from '@/components/ServiceCard';
 import { TrustBadges } from '@/components/TrustBadges';
 import { useCatalog } from '@/data/services';
 import { useResponsive } from '@/hooks/useResponsive';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, createStyles } from '@/theme';
 
 export default function ServicesScreen() {
   const { searchServices } = useCatalog();
@@ -77,7 +77,7 @@ export default function ServicesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   header: {
     backgroundColor: colors.surface,
     paddingTop: spacing.xxxl,
@@ -87,4 +87,4 @@ const styles = StyleSheet.create({
   },
   search: { maxWidth: 640, marginTop: spacing.sm },
   body: { paddingTop: spacing.xxl },
-});
+}));

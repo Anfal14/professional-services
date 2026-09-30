@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, View } from 'react-native';
-import { colors, fonts, radius } from '@/theme';
+import { View } from 'react-native';
+import { colors, fonts, radius, createStyles } from '@/theme';
 import { TIME_SLOTS, isSlotAvailable } from '@/utils/format';
 import { AppText } from '../AppText';
 import { PressableScale } from '../PressableScale';
@@ -48,7 +48,7 @@ export function TimeSlotSelector({ date, value, onChange, error, hideLabel }: Ti
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   slot: {
     flexDirection: 'row',
@@ -69,4 +69,4 @@ const styles = StyleSheet.create({
   text: { fontFamily: fonts.semibold, fontSize: 13.5, color: colors.ink },
   activeText: { color: colors.white },
   strike: { textDecorationLine: 'line-through', color: colors.subtle },
-});
+}));

@@ -1,24 +1,42 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { DEFAULT_CITY, type City } from '@/data/locations';
+import type { Address } from '@profecian/shared';
+import { useCustomer } from '@/backend';
 import * as api from '@/services/locationApi';
+import type { CurrentLocation, LocationSelection } from '@/services/locationApi';
 
 interface LocationContextValue {
-  city: City;
+  selection: LocationSelection;
+  /** City the customer is booking in (from the address, detected location or picked city). */
+  city: string;
+  /** The chosen saved address, if the selection is one. */
+  selectedAddress?: Address;
+  /** Top-bar line 1, e.g. "Home", "Current location" or "Solapur". */
+  title: string;
+  /** Top-bar line 2 — the full address, or a prompt to add one. */
+  subtitle: string;
+  addresses: Address[];
   loading: boolean;
-  setCity: (city: City) => void;
+  selectCity: (city: string) => void;
+  selectAddress: (address: Address) => void;
+  selectCurrent: (current: CurrentLocation) => void;
 }
 
 const LocationContext = createContext<LocationContextValue | null>(null);
 
+export function formatFullAddress(a: Pick<Address, 'line' | 'landmark' | 'city' | 'pincode'>): string {
+  return [a.line, a.landmark ? `Near ${a.landmark}` : '', a.city + (a.pincode ? ` ${a.pincode}` : '')].filter(Boolean).join(', ');
+}
+
 export function LocationProvider({ children }: { children: ReactNode }) {
-  const [city, setCityState] = useState<City>(DEFAULT_CITY);
+  const customer = useCustomer();
+  const [selection, setSelection] = useState<LocationSelection>(api.DEFAULT_SELECTION);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    api.fetchCity().then((c) => {
+    api.fetchSelection().then((s) => {
       if (!active) return;
-      setCityState(c);
+      setSelection(s);
       setLoading(false);
     });
     return () => {
@@ -26,12 +44,38 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const setCity = useCallback((next: City) => {
-    setCityState(next);
-    api.saveCity(next);
+  const choose = useCallback((next: LocationSelection) => {
+    setSelection(next);
+    api.saveSelection(next).catch(() => undefined);
   }, []);
 
-  const value = useMemo(() => ({ city, loading, setCity }), [city, loading, setCity]);
+  const addresses = useMemo(() => customer?.addresses ?? [], [customer]);
+
+  const value = useMemo<LocationContextValue>(() => {
+    // A saved address that no longer exists (deleted, or signed out) falls back to its city.
+    const selectedAddress = selection.kind === 'saved' ? addresses.find((a) => a.id === selection.addressId) : undefined;
+    let title: string = selection.city;
+    let subtitle = 'Set your exact address for faster booking';
+    if (selectedAddress) {
+      title = selectedAddress.label;
+      subtitle = formatFullAddress(selectedAddress);
+    } else if (selection.kind === 'current') {
+      title = 'Current location';
+      subtitle = `${selection.area}, ${selection.city}`;
+    }
+    return {
+      selection,
+      city: selectedAddress?.city ?? selection.city,
+      selectedAddress,
+      title,
+      subtitle,
+      addresses,
+      loading,
+      selectCity: (city) => choose({ kind: 'city', city }),
+      selectAddress: (a) => choose({ kind: 'saved', addressId: a.id, city: a.city }),
+      selectCurrent: (current) => choose(current),
+    };
+  }, [selection, addresses, loading, choose]);
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;
 }

@@ -12,7 +12,7 @@ import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { ABOUT_IMAGE, TECH_IMAGE, stats, type IconName } from '@/data/services';
 import { useResponsive } from '@/hooks/useResponsive';
-import { colors, fonts, gradients, radius, shadows, spacing } from '@/theme';
+import { accentShade, colors, fonts, gradients, radius, shadows, spacing, createStyles } from '@/theme';
 
 const VALUES: { icon: IconName; title: string; text: string }[] = [
   { icon: 'shield-checkmark', title: 'Trust & safety', text: 'Every professional clears ID, address and background checks before their first job.' },
@@ -35,7 +35,7 @@ export default function AboutScreen() {
     <Screen pageTitle="About Us">
       <View style={[styles.hero, { minHeight: select({ mobile: 340, tablet: 380, desktop: 440 }) }]}>
         <Image source={ABOUT_IMAGE} style={StyleSheet.absoluteFill} contentFit="cover" transition={300} />
-        <LinearGradient colors={['rgba(40,16,110,0.55)', 'rgba(15,15,26,0.9)']} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={[accentShade(0.55), 'rgba(15,15,26,0.9)']} style={StyleSheet.absoluteFill} />
         <Container style={styles.heroContent}>
           <FadeIn style={{ gap: spacing.md, maxWidth: 680 }}>
             <AppText style={styles.eyebrow}>ABOUT QUICKJOB</AppText>
@@ -127,10 +127,10 @@ export default function AboutScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  hero: { justifyContent: 'flex-end', backgroundColor: colors.ink, overflow: 'hidden' },
+const styles = createStyles(() => ({
+  hero: { justifyContent: 'flex-end', backgroundColor: colors.night, overflow: 'hidden' },
   heroContent: { paddingTop: spacing.huge, paddingBottom: 72 },
-  eyebrow: { fontFamily: fonts.bold, fontSize: 12, letterSpacing: 1.4, color: '#C9B8FF' },
+  eyebrow: { fontFamily: fonts.bold, fontSize: 12, letterSpacing: 1.4, color: colors.accentTint },
   heroTitle: { fontFamily: fonts.extrabold, color: colors.white, letterSpacing: -1 },
   heroSub: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 25, color: 'rgba(255,255,255,0.85)' },
   stats: {
@@ -168,4 +168,4 @@ const styles = StyleSheet.create({
   cta: { flexDirection: 'row', alignItems: 'center', gap: spacing.xl, padding: spacing.xxxl, borderRadius: radius.xxl },
   ctaTitle: { fontFamily: fonts.extrabold, fontSize: 22, color: colors.white },
   ctaText: { fontFamily: fonts.regular, fontSize: 15, color: 'rgba(255,255,255,0.85)' },
-});
+}));

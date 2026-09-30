@@ -3,12 +3,11 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Linking, View } from 'react-native';
 import {
-  BOOKING_STATUS, formatDate, formatINR, formatPhone, mapsUrl, PAYMENT_METHOD_LABEL, PAYMENT_STATUS, TRACKING_STEPS, useAction, useBackend, useDb,
+  BOOKING_STATUS, bookingProblemLabel, formatDate, formatINR, formatPhone, mapsUrl, PAYMENT_METHOD_LABEL, PAYMENT_STATUS, TRACKING_STEPS, useAction, useBackend, useDb,
   VENDOR_ACTION_LABEL, VENDOR_NEXT,
 } from '@profecian/shared';
 import {
-  AppText, asIcon, Badge, Banner, Button, Card, colors, confirmAction, Divider, EmptyState, KeyValue, PhotoPicker, promptText, radius, spacing, Timeline,
-} from '@profecian/ui';
+  AppText, asIcon, Badge, Banner, Button, Card, colors, confirmAction, Divider, EmptyState, KeyValue, PhotoPicker, promptText, radius, spacing, Timeline, tintTile } from '@profecian/ui';
 import { useVendor } from '@/backend';
 import { VendorScreen } from '@/components/VendorScreen';
 
@@ -62,15 +61,15 @@ export default function JobDetail() {
   ) : null;
 
   return (
-    <VendorScreen title={problem?.name ?? 'Job'} subtitle={`${category?.name} · ${job.code}`} back footer={footer}>
+    <VendorScreen title={bookingProblemLabel(db, job) || 'Job'} subtitle={`${category?.name} · ${job.code}`} back footer={footer}>
       {error ? <Banner tone="danger" icon="alert-circle" title={error} /> : null}
       {job.status === 'assigned' ? <Banner tone="warning" icon="flash-outline" title="New job — please accept" message="Customer contact details are shared once you accept." /> : null}
       {job.status === 'cancelled' ? <Banner tone="danger" icon="close-circle" title="This job was cancelled" message={job.cancelReason} /> : null}
 
       <Card style={{ gap: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-          <View style={{ width: 48, height: 48, borderRadius: radius.md, backgroundColor: category?.tint ?? colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name={asIcon(problem?.icon ?? 'construct-outline')} size={24} color={colors.ink} />
+          <View style={{ width: 48, height: 48, borderRadius: radius.md, backgroundColor: tintTile(category?.tint).bg, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name={asIcon(problem?.icon ?? 'construct-outline')} size={24} color={tintTile(category?.tint).fg} />
           </View>
           <View style={{ flex: 1 }}>
             <AppText variant="h3">{formatDate(job.date)}, {job.slot}</AppText>

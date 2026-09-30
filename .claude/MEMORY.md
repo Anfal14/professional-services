@@ -18,7 +18,8 @@ Customer 9876500001 · Vendor 9876500101 (approved) / 9876500109 (pending) · OT
 ## Constraints
 - Web + Android + iOS for customer/vendor; guard platform-only APIs.
 - React Compiler lint: no ref reads in render, no sync setState in effects.
-- Status colors reserved; charts follow dataviz rules (validated palette in `packages/ui/src/theme.ts` `chartColors`).
+- Status colors reserved; charts follow dataviz rules (light + dark palettes validated in `packages/ui/src/theme.ts`).
+- **Theming:** never `StyleSheet.create` or copy a colour into a module-level constant — use `createStyles(() => ({...}))` and read `colors`/`shadows`/`type` at render. Tokens are live objects rewritten by `applyTheme`; `ThemeProvider` remounts the tree on change. Use `colors.night` for always-dark surfaces, `colors.inverse` for text on `ink`, `tintTile()` for category tint tiles.
 - Customer app keeps the user's own edits: Google demo login, hero (mobile subtitle + TrustBadges, minHeight 300), storage keys `@profecian/...`.
 
 ## Known issues / placeholders
@@ -31,4 +32,4 @@ Git root `Documents/professional-services`, remote `https://github.com/Anfal14/p
 Root: `npm run typecheck`, `npm run lint`. Per app: `npx expo-doctor`, `npx expo export --platform web` (+ android/ios for customer/vendor). All clean on 2026-09-28.
 
 ## Current focus
-Platform frontend complete (`changes/2026-09-28-three-app-platform.md`). Next: pick backend, replace mock with an HTTP client of the same surface, real OTP/WhatsApp Business/payment gateway, shared state across apps.
+2026-09-29: customer cart (multi-select problems → one booking per service), Zomato-style location/addresses, purple/dark-blue × light/dark/system themes in all apps (`changes/2026-09-29-cart-location-theme.md`). Uncommitted on branch `feat/quickjob-app`. Platform base: `changes/2026-09-28-three-app-platform.md`. Next: pick backend, replace mock with an HTTP client of the same surface, real OTP/WhatsApp Business/payment gateway, shared state across apps.

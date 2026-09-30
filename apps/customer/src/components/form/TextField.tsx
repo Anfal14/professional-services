@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { forwardRef, useState } from 'react';
-import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import { TextInput, View, type TextInputProps } from 'react-native';
 import type { IconName } from '@/data/services';
-import { colors, fonts, radius } from '@/theme';
+import { colors, fonts, radius, createStyles } from '@/theme';
 import { AppText } from '../AppText';
 import { FieldShell } from './FieldShell';
 
@@ -66,7 +66,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
   );
 });
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   box: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -79,8 +79,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   multiline: { alignItems: 'flex-start', paddingVertical: 12 },
-  focused: { borderColor: colors.primary, backgroundColor: '#FDFCFF' },
-  errored: { borderColor: colors.danger, backgroundColor: '#FFFBFB' },
+  focused: { borderColor: colors.primary, backgroundColor: colors.inputBg },
+  errored: { borderColor: colors.danger, backgroundColor: colors.inputErrorBg },
   iconTop: { marginTop: 2 },
   prefix: { paddingRight: 10, borderRightWidth: 1, borderRightColor: colors.border },
   prefixText: { fontFamily: fonts.semibold, fontSize: 15, color: colors.ink },
@@ -94,4 +94,4 @@ const styles = StyleSheet.create({
     outlineStyle: 'none',
   } as object,
   inputMultiline: { minHeight: 72, paddingVertical: 0, textAlignVertical: 'top' },
-});
+}));

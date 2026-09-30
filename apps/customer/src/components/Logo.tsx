@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet, View } from 'react-native';
-import { colors, fonts, gradients } from '@/theme';
+import { View } from 'react-native';
+import { colors, fonts, gradients, createStyles } from '@/theme';
 import { AppText } from './AppText';
 
 export function Logo({ light = false, size = 34 }: { light?: boolean; size?: number }) {
@@ -16,14 +16,14 @@ export function Logo({ light = false, size = 34 }: { light?: boolean; size?: num
         <Ionicons name="flash" size={size * 0.55} color={colors.white} />
       </LinearGradient>
       <AppText style={[styles.word, { color: light ? colors.white : colors.ink, fontSize: size * 0.6 }]}>
-        Profe<AppText style={[styles.word, { color: light ? '#C9B8FF' : colors.primary, fontSize: size * 0.6 }]}>cian</AppText>
+        Profe<AppText style={[styles.word, { color: light ? colors.accentTint : colors.primary, fontSize: size * 0.6 }]}>cian</AppText>
       </AppText>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   mark: { alignItems: 'center', justifyContent: 'center' },
   word: { fontFamily: fonts.extrabold, letterSpacing: -0.5 },
-});
+}));

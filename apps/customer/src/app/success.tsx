@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Animated, Easing, Linking, Platform, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Linking, Platform, View } from 'react-native';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
@@ -10,10 +10,10 @@ import { FadeIn } from '@/components/FadeIn';
 import { Screen } from '@/components/Screen';
 import { WhatsAppPreview } from '@/components/WhatsAppPreview';
 import { useBookings } from '@/context/BookingsContext';
-import { formatPhone, useDb } from '@profecian/shared';
+import { bookingProblemLabel, formatPhone, useDb } from '@profecian/shared';
 import { useCatalog } from '@/data/services';
 import { useResponsive } from '@/hooks/useResponsive';
-import { colors, fonts, radius, shadows, spacing } from '@/theme';
+import { colors, fonts, radius, shadows, spacing, createStyles } from '@/theme';
 import { formatAddress, formatDate, formatPrice } from '@/utils/format';
 import { buildAcknowledgement, openWhatsApp } from '@/utils/whatsapp';
 
@@ -52,7 +52,7 @@ function SuccessCheck() {
 }
 
 export default function SuccessScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, more } = useLocalSearchParams<{ id: string; more?: string }>();
   const { getBooking, loading } = useBookings();
   const db = useDb();
   const { getService } = useCatalog();
@@ -76,7 +76,9 @@ export default function SuccessScreen() {
   }
 
   const service = getService(booking.categoryId);
-  const issueTitle = db.problemTypes.find((p) => p.id === booking.problemTypeId)?.name ?? '';
+  const issueTitle = bookingProblemLabel(db, booking);
+  // Other visits placed from the same cart checkout (one booking per service).
+  const extra = (more ?? '').split(',').map((x) => getBooking(x)).filter((b): b is NonNullable<typeof b> => !!b);
   const message = buildAcknowledgement(db, booking);
   // The acknowledgement the platform sent on the customer's behalf (stubbed WhatsApp API).
   const ackUrl = db.notifications.find((n) => n.bookingId === booking.id && n.kind === 'booking_confirmed')?.whatsappUrl;
@@ -97,7 +99,7 @@ export default function SuccessScreen() {
           <SuccessCheck />
           <FadeIn delay={250} style={{ alignItems: 'center', gap: 6 }}>
             <AppText variant="h1" align="center" accessibilityRole="header">
-              Booking Confirmed!
+              {extra.length ? `${extra.length + 1} Bookings Confirmed!` : 'Booking Confirmed!'}
             </AppText>
             <AppText variant="body" color={colors.muted} align="center" style={{ maxWidth: 440 }}>
               Thanks, {booking.customerName.split(' ')[0]}! We’re assigning a verified professional — you’ll get their details on WhatsApp.
@@ -108,6 +110,20 @@ export default function SuccessScreen() {
                 {booking.code}
               </AppText>
             </View>
+            {extra.length ? (
+              <View style={styles.extra}>
+                {extra.map((b) => (
+                  <Button
+                    key={b.id}
+                    label={`${getService(b.categoryId)?.name ?? 'Service'} · ${b.code}`}
+                    icon="navigate-outline"
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => router.replace(`/booking/${b.id}`)}
+                  />
+                ))}
+              </View>
+            ) : null}
           </FadeIn>
         </View>
 
@@ -161,7 +177,8 @@ export default function SuccessScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
+  extra: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.sm },
   page: { paddingTop: spacing.xxxl, maxWidth: 1000 },
   top: { alignItems: 'center', gap: spacing.xl, marginBottom: spacing.xxxl },
   checkWrap: { width: 110, height: 110, alignItems: 'center', justifyContent: 'center' },
@@ -213,4 +230,4 @@ const styles = StyleSheet.create({
   total: { fontFamily: fonts.extrabold, fontSize: 22, color: colors.primary },
   waHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.md, marginTop: spacing.xxxl },
-});
+}));

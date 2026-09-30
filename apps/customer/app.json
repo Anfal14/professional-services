@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.profecian.app"
@@ -32,7 +32,13 @@
       "expo-status-bar",
       "expo-image",
       "expo-font",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Profecian uses your location to fill in the service address for your booking."
+        }
+      ]
     ],
     "scheme": "profecian",
     "experiments": {

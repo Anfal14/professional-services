@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
@@ -13,7 +13,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { APP_CONFIG } from '@/config';
 import type { IconName } from '@/data/services';
 import { useResponsive } from '@/hooks/useResponsive';
-import { colors, fonts, radius, shadows, spacing } from '@/theme';
+import { colors, fonts, radius, shadows, spacing, createStyles } from '@/theme';
 import { isValidPhone } from '@/utils/validation';
 import { openWhatsApp } from '@/utils/whatsapp';
 
@@ -34,7 +34,7 @@ export default function ContactScreen() {
 
   const channels: { icon: IconName; title: string; value: string; color: string; bg: string; onPress: () => void }[] = [
     { icon: 'call', title: 'Call us', value: APP_CONFIG.supportPhone, color: colors.primary, bg: colors.primarySoft, onPress: () => Linking.openURL(`tel:${APP_CONFIG.supportPhone.replace(/\s/g, '')}`) },
-    { icon: 'logo-whatsapp', title: 'WhatsApp', value: 'Reply in ~2 mins', color: colors.whatsappDark, bg: '#E8FAF0', onPress: () => openWhatsApp('Hi Profecian!') },
+    { icon: 'logo-whatsapp', title: 'WhatsApp', value: 'Reply in ~2 mins', color: colors.whatsappDark, bg: colors.successSoft, onPress: () => openWhatsApp('Hi Profecian!') },
     { icon: 'mail', title: 'Email', value: APP_CONFIG.supportEmail, color: colors.info, bg: colors.infoSoft, onPress: () => Linking.openURL(`mailto:${APP_CONFIG.supportEmail}`) },
     { icon: 'time', title: 'Support hours', value: APP_CONFIG.hours, color: colors.warning, bg: colors.warningSoft, onPress: () => undefined },
   ];
@@ -154,7 +154,7 @@ export default function ContactScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   header: { backgroundColor: colors.surface, paddingVertical: spacing.huge, borderBottomWidth: 1, borderBottomColor: colors.border },
   eyebrow: { fontFamily: fonts.bold, fontSize: 12, letterSpacing: 1.4, color: colors.primary },
   channel: {
@@ -180,11 +180,11 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     ...shadows.md,
   },
-  office: { flexDirection: 'row', gap: spacing.lg, alignItems: 'center', backgroundColor: colors.ink, borderRadius: radius.xl, padding: spacing.xl },
+  office: { flexDirection: 'row', gap: spacing.lg, alignItems: 'center', backgroundColor: colors.night, borderRadius: radius.xl, padding: spacing.xl },
   officeIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   officeTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.white },
   officeText: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 21, color: 'rgba(255,255,255,0.75)' },
   faq: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border },
-  faqOpen: { borderColor: colors.primaryBorder, backgroundColor: '#FDFCFF' },
+  faqOpen: { borderColor: colors.primaryBorder, backgroundColor: colors.inputBg },
   faqHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-});
+}));

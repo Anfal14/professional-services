@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { formatINR, useBackend, useDb } from '@profecian/shared';
-import { AppText, asIcon, Badge, Button, Card, colors, radius, spacing, Toggle } from '@profecian/ui';
+import { AppText, asIcon, Badge, Button, Card, radius, spacing, Toggle, tintTile } from '@profecian/ui';
 import { Page } from '@/components/admin';
 import { CategorySheet } from '@/components/ServiceForms';
 
@@ -31,8 +31,8 @@ export default function Services() {
             <Card key={c.id} padded={false} onPress={() => router.navigate(`/services/${c.id}`)} style={{ width: 300, flexGrow: 1, maxWidth: 420, overflow: 'hidden', opacity: c.enabled ? 1 : 0.7 }}>
               <View style={{ height: 110, backgroundColor: c.tint }}>
                 {c.image ? <Image source={c.image} style={{ width: '100%', height: '100%' }} contentFit="cover" /> : null}
-                <View style={{ position: 'absolute', top: 10, left: 10, width: 36, height: 36, borderRadius: radius.md, backgroundColor: c.tint, alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name={asIcon(c.icon)} size={20} color={colors.ink} />
+                <View style={{ position: 'absolute', top: 10, left: 10, width: 36, height: 36, borderRadius: radius.md, backgroundColor: tintTile(c.tint).bg, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name={asIcon(c.icon)} size={20} color={tintTile(c.tint).fg} />
                 </View>
                 <View style={{ position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 6 }}>
                   {c.popular ? <Badge label="Popular" tone="primary" /> : null}

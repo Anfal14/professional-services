@@ -15,15 +15,3 @@ export interface AuthUser {
   provider: AuthProvider;
 }
 
-/** Details collected by the booking form (service + schedule come from the service screen). */
-export interface BookingForm {
-  issueId: string;
-  name: string;
-  phone: string;
-  address: string;
-  landmark?: string;
-  /** ISO date, yyyy-mm-dd */
-  date: string;
-  /** Slot label, e.g. "10:00 AM" */
-  time: string;
-}

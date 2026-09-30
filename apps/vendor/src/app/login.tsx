@@ -2,10 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Head from 'expo-router/head';
 import { Redirect, router } from 'expo-router';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DEMO, formatPhone, useBackend } from '@profecian/shared';
-import { AppText, colors, fonts, gradients, OtpLogin, spacing } from '@profecian/ui';
+import { AppText, colors, fonts, gradients, OtpLogin, spacing, createStyles } from '@profecian/ui';
 import { useVendor } from '@/backend';
 
 const PERKS = [
@@ -33,7 +33,7 @@ export default function VendorLogin() {
           <View style={{ gap: 8 }}>
             {PERKS.map((p) => (
               <View key={p.text} style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-                <Ionicons name={p.icon} size={18} color="#E3D9FF" />
+                <Ionicons name={p.icon} size={18} color={colors.accentTint} />
                 <AppText style={styles.perk}>{p.text}</AppText>
               </View>
             ))}
@@ -62,7 +62,7 @@ export default function VendorLogin() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   hero: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxxl, gap: spacing.lg },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   mark: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
@@ -70,4 +70,4 @@ const styles = StyleSheet.create({
   heroTitle: { fontFamily: fonts.extrabold, fontSize: 28, lineHeight: 34, color: colors.white, letterSpacing: -0.6, maxWidth: 420 },
   perk: { fontFamily: fonts.medium, fontSize: 14, color: 'rgba(255,255,255,0.92)', flex: 1 },
   form: { padding: spacing.xl, marginTop: -spacing.lg, backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-});
+}));

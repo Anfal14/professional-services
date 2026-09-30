@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useDb, type Booking } from '@profecian/shared';
+import { bookingProblemLabel, useDb, type Booking } from '@profecian/shared';
 
 /** Name lookups over the current snapshot, memoised per database version. */
 export function useLookups() {
@@ -15,7 +15,7 @@ export function useLookups() {
       problem,
       vendor,
       customer,
-      serviceLabel: (b: Booking) => `${category.get(b.categoryId)?.name ?? 'Service'} · ${problem.get(b.problemTypeId)?.name ?? ''}`,
+      serviceLabel: (b: Booking) => `${category.get(b.categoryId)?.name ?? 'Service'} · ${bookingProblemLabel(db, b)}`,
       vendorName: (id?: string) => (id ? vendor.get(id)?.name ?? 'Unknown' : '—'),
     };
   }, [db]);

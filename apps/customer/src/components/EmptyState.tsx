@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import type { IconName } from '@/data/services';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, createStyles } from '@/theme';
 import { AppText } from './AppText';
 import { Button } from './Button';
 
@@ -30,7 +30,7 @@ export function EmptyState({ icon, title, message, actionLabel, onAction }: Empt
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   wrap: { alignItems: 'center', paddingVertical: spacing.huge, paddingHorizontal: spacing.xl, gap: spacing.sm },
   iconWrap: {
     width: 80,
@@ -43,4 +43,4 @@ const styles = StyleSheet.create({
   },
   message: { maxWidth: 360 },
   btn: { marginTop: spacing.lg, alignSelf: 'center' },
-});
+}));

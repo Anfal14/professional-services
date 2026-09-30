@@ -25,7 +25,7 @@ export default function Notifications() {
       <Card padded={false}>
         {items.map((n, i) => (
           <Pressable key={n.id} onPress={() => { backend.vendor.markNotificationsRead(vendor.id, [n.id]); if (n.bookingId) router.push(`/job/${n.bookingId}`); }}
-            style={{ flexDirection: 'row', gap: spacing.md, padding: spacing.lg, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border, backgroundColor: n.read ? colors.surface : '#FBF9FF' }}>
+            style={{ flexDirection: 'row', gap: spacing.md, padding: spacing.lg, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border, backgroundColor: n.read ? colors.surface : colors.selectedBg }}>
             <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name={ICON[n.kind] ?? 'notifications-outline'} size={18} color={colors.primary} />
             </View>

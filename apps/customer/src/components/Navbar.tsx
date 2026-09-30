@@ -4,11 +4,11 @@ import { router, usePathname } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsive } from "@/hooks/useResponsive";
-import { colors, fonts, layout, radius, shadows, spacing } from "@/theme";
+import { colors, fonts, layout, radius, shadows, spacing, createStyles } from "@/theme";
 import { AppText } from "./AppText";
-import { BookingsButton } from "./BookingsButton";
+import { CartButton } from "./CartButton";
 import { Container } from "./Container";
-import { LocationPill } from "./LocationPill";
+import { LocationHeader } from "./LocationHeader";
 import { Logo } from "./Logo";
 import { NavAvatar } from "./NavAvatar";
 import { NAV_ITEMS, isActive } from "./navigation";
@@ -22,9 +22,10 @@ interface NavbarProps {
 }
 
 /**
- * Top-nav links: Home + Services only, with a badged Bookings button on the
- * right. About/Contact stay reachable from the footer and the account menu.
- * On mobile the avatar moves to the tab bar (components/BottomNav.tsx).
+ * Top-nav links: Home + Services only, the two-line location, and a badged
+ * cart on the right. About/Contact stay reachable from the footer and the
+ * account menu. On mobile the location replaces the logo (like Zomato) and the
+ * avatar moves to the tab bar (components/BottomNav.tsx).
  */
 const TOP_LINKS = NAV_ITEMS.filter(
   (item) => item.href === "/" || item.href === "/services",
@@ -42,7 +43,7 @@ export function Navbar({ back, title }: NavbarProps) {
   return (
     <View style={[styles.wrap, { paddingTop: insets.top }]}>
       <Container style={styles.bar}>
-        <View style={styles.left}>
+        <View style={[styles.left, isMobile && styles.leftMobile]}>
           {showBack ? (
             <>
               <PressableScale
@@ -59,6 +60,8 @@ export function Navbar({ back, title }: NavbarProps) {
                 </AppText>
               ) : null}
             </>
+          ) : isMobile ? (
+            <LocationHeader />
           ) : (
             <Pressable
               onPress={() => router.navigate("/")}
@@ -70,10 +73,9 @@ export function Navbar({ back, title }: NavbarProps) {
           )}
         </View>
 
-        {!showBack && (
-          <View style={[styles.middle, isMobile && styles.middleMobile]}>
-            {!isMobile &&
-              TOP_LINKS.map((item) => {
+        {!isMobile && (
+          <View style={styles.middle}>
+            {TOP_LINKS.map((item) => {
                 const active = isActive(pathname, item.href);
                 return (
                   <Pressable
@@ -94,12 +96,14 @@ export function Navbar({ back, title }: NavbarProps) {
                   </Pressable>
                 );
               })}
-            <LocationPill />
+            <View style={styles.locationDesktop}>
+              <LocationHeader maxWidth={300} />
+            </View>
           </View>
         )}
 
         <View style={styles.right}>
-          <BookingsButton />
+          <CartButton />
           {!isMobile && <NavAvatar />}
         </View>
       </Container>
@@ -107,9 +111,9 @@ export function Navbar({ back, title }: NavbarProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   wrap: {
-    backgroundColor: "rgba(255,255,255,0.97)",
+    backgroundColor: colors.navBg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
     zIndex: 10,
@@ -121,7 +125,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  left: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 },
+  left: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1, minWidth: 0 },
+  leftMobile: { flex: 1, marginRight: spacing.md },
   title: { flexShrink: 1 },
   middle: {
     flexDirection: "row",
@@ -130,9 +135,13 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: spacing.lg,
   },
-  middleMobile: {
-    marginHorizontal: spacing.sm,
-    justifyContent: "flex-end",
+  locationDesktop: {
+    marginLeft: spacing.md,
+    paddingLeft: spacing.lg,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.border,
+    flexShrink: 1,
+    minWidth: 0,
   },
   link: {
     paddingHorizontal: 14,
@@ -152,4 +161,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.background,
   },
-});
+}));

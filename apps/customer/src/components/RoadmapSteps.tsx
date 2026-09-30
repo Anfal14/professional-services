@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import type { IconName } from '@/data/services';
-import { colors, fonts, spacing } from '@/theme';
+import { colors, fonts, spacing, createStyles } from '@/theme';
 import { AppText } from './AppText';
 
 export interface RoadmapStep {
@@ -59,7 +59,7 @@ export function RoadmapSteps({ steps }: { steps: RoadmapStep[] }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   wrap: { position: 'relative', width: '100%' },
   svg: { position: 'absolute', left: 0, top: 0 },
   row: { position: 'absolute', left: 0, right: 0, justifyContent: 'center' },
@@ -76,4 +76,4 @@ const styles = StyleSheet.create({
   content: { marginLeft: TRACK_WIDTH + spacing.sm, gap: 4, paddingRight: spacing.xs },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   title: { fontSize: 16 },
-});
+}));
