@@ -38,7 +38,7 @@ export function TimeSlotSelector({ date, value, onChange, error, hideLabel }: Ti
               accessibilityState={{ checked: active, disabled: !date || !available }}
               accessibilityLabel={slot}
             >
-              {active ? <Ionicons name="checkmark-circle" size={13} color={colors.white} style={styles.check} /> : null}
+              {active ? <Ionicons name="checkmark-circle" size={14} color={colors.white} /> : null}
               <AppText style={[styles.text, active && styles.activeText, !available && styles.strike]}>{slot}</AppText>
             </PressableScale>
           );
@@ -54,8 +54,8 @@ const styles = createStyles(() => ({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    minWidth: 98,
+    gap: 5,
+    minWidth: 104,
     paddingVertical: 11,
     paddingHorizontal: 12,
     borderRadius: radius.md,
@@ -63,7 +63,6 @@ const styles = createStyles(() => ({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  check: { position: 'absolute', left: 7 },
   active: { backgroundColor: colors.primary, borderColor: colors.primary },
   disabled: { opacity: 0.45, backgroundColor: colors.background },
   text: { fontFamily: fonts.semibold, fontSize: 13.5, color: colors.ink },

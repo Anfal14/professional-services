@@ -1,11 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  BOOKING_STATUS, formatDateTime, isSlotAvailable, TIME_SLOTS, upcomingDays,
+  BOOKING_STATUS, formatDateTime,
   type BookingEvent,
 } from '@profecian/shared';
 import { AppText, asIcon, FieldShell, PressableScale, type WebPressableState } from './primitives';
@@ -155,59 +155,6 @@ export function Sheet({ visible, onClose, title, children, footer, width = 520 }
   );
 }
 
-/* ───────────── Date + time slot ───────────── */
-
-export function DateSlotPicker({ date, slot, onDate, onSlot, days = 10, dateError, slotError }: {
-  date?: string;
-  slot?: string;
-  onDate: (iso: string) => void;
-  onSlot: (slot: string) => void;
-  days?: number;
-  dateError?: string | null;
-  slotError?: string | null;
-}) {
-  const options = useMemo(() => upcomingDays(days), [days]);
-  const noneLeft = !!date && TIME_SLOTS.every((s) => !isSlotAvailable(date, s));
-  return (
-    <View style={{ gap: spacing.xl }}>
-      <FieldShell label="Preferred date" required error={dateError}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 2 }}>
-          {options.map((d) => {
-            const on = d.iso === date;
-            return (
-              <PressableScale key={d.iso} onPress={() => onDate(d.iso)} style={[styles.day, on && styles.dayOn]} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={`${d.weekday} ${d.day} ${d.month}`}>
-                <AppText style={[styles.dayW, on && styles.onText]}>{d.weekday}</AppText>
-                <AppText style={[styles.dayN, on && styles.onText]}>{d.day}</AppText>
-                <AppText style={[styles.dayW, on && styles.onText]}>{d.month}</AppText>
-              </PressableScale>
-            );
-          })}
-        </ScrollView>
-      </FieldShell>
-      <FieldShell label="Preferred time" required error={slotError} hint={!date ? 'Pick a date to see available slots' : noneLeft ? 'No slots left on this day — try another date' : undefined}>
-        <View style={styles.slots}>
-          {TIME_SLOTS.map((s) => {
-            const available = !!date && isSlotAvailable(date, s);
-            const on = s === slot;
-            return (
-              <Pressable
-                key={s}
-                disabled={!available}
-                onPress={() => onSlot(s)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: on, disabled: !available }}
-                style={({ hovered }: WebPressableState) => [styles.slot, hovered && available && !on && { backgroundColor: colors.surfaceAlt }, on && styles.dayOn, !available && styles.slotOff]}
-              >
-                <AppText style={[styles.slotText, on && styles.onText, !available && { color: colors.subtle }]}>{s}</AppText>
-              </Pressable>
-            );
-          })}
-        </View>
-      </FieldShell>
-    </View>
-  );
-}
-
 const styles = createStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   photos: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
@@ -229,13 +176,4 @@ const styles = createStyles(() => ({
   sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm, marginBottom: spacing.sm },
   close: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
   sheetFooter: { paddingTop: spacing.md, gap: spacing.sm },
-  day: { width: 66, paddingVertical: 10, alignItems: 'center', borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
-  dayOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  dayW: { fontFamily: fonts.semibold, fontSize: 12, color: colors.muted },
-  dayN: { fontFamily: fonts.extrabold, fontSize: 19, color: colors.ink },
-  onText: { color: colors.white },
-  slots: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  slot: { minWidth: 96, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
-  slotOff: { opacity: 0.45, backgroundColor: colors.background },
-  slotText: { fontFamily: fonts.semibold, fontSize: 13.5, color: colors.ink },
 }));

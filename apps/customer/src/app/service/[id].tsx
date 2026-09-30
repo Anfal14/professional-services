@@ -15,11 +15,20 @@ import { Rating } from '@/components/Rating';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
 import { ServiceCard } from '@/components/ServiceCard';
+import { ServiceReviews } from '@/components/ServiceReviews';
 import { useCart } from '@/context/CartContext';
 import { groupCart, otherIssue, useCatalog } from '@/data/services';
 import { useResponsive } from '@/hooks/useResponsive';
 import { colors, createStyles, fonts, gradients, radius, shadows, spacing } from '@/theme';
 import { formatPrice } from '@/utils/format';
+
+/** What every booking comes with, whatever the service. */
+const PROMISES = [
+  { icon: 'shield-checkmark', label: 'Trained and verified technicians' },
+  { icon: 'construct', label: 'Genuine spare parts' },
+  { icon: 'pricetag', label: 'Affordable pricing' },
+  { icon: 'flash', label: 'Same day service (subject to availability)' },
+] as const;
 
 export default function ServiceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -85,10 +94,6 @@ export default function ServiceDetailScreen() {
               <View style={styles.metaPill}>
                 <Rating value={service.rating} reviews={`${service.reviews} reviews`} light />
               </View>
-              <View style={styles.metaPill}>
-                <Ionicons name="time-outline" size={14} color={colors.white} />
-                <AppText style={styles.metaText}>Arrives in {service.eta}</AppText>
-              </View>
             </View>
           </FadeIn>
         </Container>
@@ -116,14 +121,16 @@ export default function ServiceDetailScreen() {
               Every booking includes
             </AppText>
             <Grid columns={select({ mobile: 1, tablet: 2 })} gap={12}>
-              {service.includes.map((inc) => (
-                <View key={inc} style={styles.includeItem}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                  <AppText variant="bodyMedium">{inc}</AppText>
+              {PROMISES.map((p) => (
+                <View key={p.label} style={styles.includeItem}>
+                  <Ionicons name={p.icon} size={20} color={colors.success} />
+                  <AppText variant="bodyMedium" style={{ flex: 1 }}>{p.label}</AppText>
                 </View>
               ))}
             </Grid>
           </View>
+
+          <ServiceReviews serviceId={service.id} />
         </View>
 
         {isDesktop && (
@@ -183,7 +190,6 @@ const styles = createStyles(() => ({
     paddingVertical: 6,
     borderRadius: radius.pill,
   },
-  metaText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.white },
   body: { paddingTop: spacing.huge },
   bodyRow: { flexDirection: 'row', gap: spacing.xxxl, alignItems: 'flex-start' },
   main: { flex: 1 },

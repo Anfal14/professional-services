@@ -59,7 +59,8 @@ export const Screen = forwardRef<ScrollView, ScreenProps>(function Screen(
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.flex}>{children}</View>
-          {footer && <Footer />}
+          {/* The footer is a website element — the native app uses the tab bar and account menu. */}
+          {footer && Platform.OS === 'web' && <Footer />}
         </ScrollView>
         {actionBar ? (
           <View style={[styles.actionBar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>

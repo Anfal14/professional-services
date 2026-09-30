@@ -3,7 +3,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Linking, ScrollView, StyleSheet, View } from "react-native";
 import { AppText } from "@/components/AppText";
 import { Button } from "@/components/Button";
 import { Container } from "@/components/Container";
@@ -28,7 +28,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useBookings } from "@/context/BookingsContext";
 import { useResponsive } from "@/hooks/useResponsive";
 import { accentShade, colors, fonts, gradients, radius, shadows, spacing, createStyles } from "@/theme";
-import { openWhatsApp } from "@/utils/whatsapp";
+import { APP_CONFIG } from "@/config";
 
 const STEPS: RoadmapStep[] = [
   {
@@ -389,15 +389,15 @@ export default function HomeScreen() {
               Need help choosing a service?
             </AppText>
             <AppText style={styles.ctaText}>
-              Chat with our experts on WhatsApp — we reply within 2 minutes.
+              Call our experts — we’ll help you pick the right service.
             </AppText>
           </View>
           <Button
-            label="Chat on WhatsApp"
-            icon="logo-whatsapp"
+            label={`Call ${APP_CONFIG.supportPhone}`}
+            icon="call"
             variant="light"
             onPress={() =>
-              openWhatsApp("Hi Profecian, I need help choosing a service.")
+              Linking.openURL(`tel:${APP_CONFIG.supportPhone.replace(/s/g, "")}`)
             }
           />
         </LinearGradient>

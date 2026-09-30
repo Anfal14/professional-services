@@ -45,6 +45,7 @@ export default function CartScreen() {
   const [phone, setPhone] = useState(customer?.phone ?? '');
   const [touched, setTouched] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -151,7 +152,9 @@ export default function CartScreen() {
     <View style={styles.actionRow}>
       <View style={{ flex: 1 }}>
         <AppText variant="small">{cart.count} {cart.count === 1 ? 'item' : 'items'}</AppText>
-        <AppText style={styles.actionTotal}>{formatPrice(total)}</AppText>
+        <AppText style={styles.actionTotal}>
+          {formatPrice(total)} <AppText variant="small">(Inc. GST)</AppText>
+        </AppText>
       </View>
       <Button label={customer ? (groups.length > 1 ? `Place ${groups.length} bookings` : 'Place booking') : 'Log in to book'} icon={customer ? 'checkmark-circle' : 'log-in-outline'} loading={submitting} onPress={placeOrder} />
     </View>
@@ -204,8 +207,8 @@ export default function CartScreen() {
               </View>
             ))}
 
-            <FormCard title="Visit date" icon="calendar-outline">
-              <DateSelector hideLabel value={date} onChange={pickDate} error={shown('date')} />
+            <FormCard title="Visit date" icon="calendar-outline" onIconPress={() => setCalendarOpen(true)} iconLabel="Open calendar to pick any date">
+              <DateSelector hideLabel value={date} onChange={pickDate} error={shown('date')} calendarOpen={calendarOpen} onCalendarOpenChange={setCalendarOpen} />
             </FormCard>
             <FormCard title="Visit time" icon="time-outline">
               <TimeSlotSelector hideLabel date={date} value={time} onChange={setTime} error={shown('time')} />

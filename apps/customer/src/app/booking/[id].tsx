@@ -4,11 +4,11 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Linking, View } from 'react-native';
 import {
-  bookingProblemLabel, BOOKING_STATUS, canCustomerModify, formatDate, formatDateTime, formatINR, formatPhone, ONLINE_METHODS, PAYMENT_METHOD_LABEL, PAYMENT_STATUS,
+  bookingProblemLabel, bookingProblemNames, BOOKING_STATUS, canCustomerModify, isSlotAvailable, formatDate, formatDateTime, formatINR, formatPhone, ONLINE_METHODS, PAYMENT_METHOD_LABEL, PAYMENT_STATUS,
   suggestVendors, TRACKING_STEPS, useAction, useBackend, useDb, VENDOR_NEXT, type Booking, type PaymentMethod,
 } from '@profecian/shared';
 import {
-  asIcon, Banner, Button as UiButton, Card, ChipGroup, DateSlotPicker, Divider, KeyValue, PhotoPicker, Sheet, StarInput, Stars, TextField, Timeline, Toggle,
+  asIcon, Banner, hasOpenSlots, Button as UiButton, Card, ChipGroup, DateSlotPicker, Divider, KeyValue, PhotoPicker, Sheet, StarInput, Stars, TextField, Timeline, Toggle,
 } from '@profecian/ui';
 import { AppText } from '@/components/AppText';
 import { Container } from '@/components/Container';
@@ -19,7 +19,7 @@ import { useCustomer } from '@/backend';
 import { useCatalog } from '@/data/services';
 import { useResponsive } from '@/hooks/useResponsive';
 import { colors, fonts, radius, spacing, createStyles } from '@/theme';
-import { openWhatsApp } from '@/utils/whatsapp';
+import { APP_CONFIG } from '@/config';
 
 const STEP_LABEL: Record<string, string> = {
   pending_assignment: 'Booked',
@@ -102,14 +102,14 @@ export default function BookingDetail() {
     <View style={{ gap: spacing.lg }}>
       <Card style={{ gap: 4 }}>
         <AppText variant="h3" style={{ marginBottom: 6 }}>Payment</AppText>
-        {booking.items?.length ? (
-          booking.items.map((i) => <KeyValue key={i.problemTypeId} label={i.name} value={formatINR(i.price)} />)
-        ) : (
-          <KeyValue label={problemLabel || 'Service'} value={formatINR(booking.price.serviceAmount)} />
-        )}
-        <KeyValue label={`GST (${Math.round((booking.price.tax / Math.max(1, booking.price.serviceAmount)) * 100)}%)`} value={formatINR(booking.price.tax)} />
+        {bookingProblemNames(db, booking).map((name) => (
+          <View key={name} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="checkmark-circle-outline" size={16} color={colors.muted} />
+            <AppText variant="bodyMedium">{name}</AppText>
+          </View>
+        ))}
         <Divider style={{ marginVertical: 6 }} />
-        <KeyValue label="Total" value={formatINR(booking.price.total)} strong />
+        <KeyValue label="Total (Inc. GST)" value={formatINR(booking.price.total)} strong />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
           <AppText variant="small">{cancelled ? 'Not charged' : `${PAYMENT_STATUS[booking.payment.status].label}${booking.payment.method ? ` · ${PAYMENT_METHOD_LABEL[booking.payment.method]}` : ''}`}</AppText>
         </View>
@@ -138,7 +138,7 @@ export default function BookingDetail() {
       <Card style={{ gap: spacing.md }}>
         <AppText variant="h3">Need help?</AppText>
         <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
-          <UiButton label="WhatsApp support" size="sm" variant="whatsapp" icon="logo-whatsapp" onPress={() => openWhatsApp(`Hi Profecian, I need help with booking ${booking.code}.`)} />
+          <UiButton label={`Call ${APP_CONFIG.supportPhone}`} size="sm" icon="call-outline" onPress={() => Linking.openURL(`tel:${APP_CONFIG.supportPhone.replace(/s/g, '')}`)} />
           {!cancelled ? <UiButton label="Report an issue" size="sm" variant="outline" icon="flag-outline" onPress={() => setSheet('complaint')} /> : null}
         </View>
         {db.complaints.filter((c) => c.bookingId === booking.id).map((c) => (
@@ -359,15 +359,17 @@ function MethodRow({ icon, title, hint, selected, onPress }: { icon: string; tit
 
 function RescheduleSheet({ booking, onClose }: { booking: Booking; onClose: () => void }) {
   const backend = useBackend();
-  const [date, setDate] = useState<string | undefined>();
-  const [slot, setSlot] = useState<string | undefined>();
+  // Start from the current visit so the last selection is kept (if it is still bookable).
+  const [date, setDate] = useState<string | undefined>(() => (hasOpenSlots(booking.date) ? booking.date : undefined));
+  const [slot, setSlot] = useState<string | undefined>(() => (isSlotAvailable(booking.date, booking.slot) ? booking.slot : undefined));
   const save = useAction(backend.customer.rescheduleBooking);
+  const unchanged = date === booking.date && slot === booking.slot;
   return (
     <Sheet visible onClose={onClose} title="Reschedule visit" width={640}
-      footer={<UiButton label="Confirm new time" fullWidth disabled={!date || !slot} loading={save.pending} onPress={async () => { if (date && slot && (await save.run(booking.id, date, slot))) onClose(); }} />}>
+      footer={<UiButton label="Confirm new time" fullWidth disabled={!date || !slot || unchanged} loading={save.pending} onPress={async () => { if (date && slot && (await save.run(booking.id, date, slot))) onClose(); }} />}>
       <AppText variant="small">Currently {formatDate(booking.date)}, {booking.slot}. Your professional will be informed.</AppText>
       {save.error ? <Banner tone="danger" icon="alert-circle" title={save.error} /> : null}
-      <DateSlotPicker date={date} slot={slot} onDate={(d) => { setDate(d); setSlot(undefined); }} onSlot={setSlot} />
+      <DateSlotPicker date={date} slot={slot} onDate={setDate} onSlot={setSlot} />
     </Sheet>
   );
 }

@@ -1,21 +1,18 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Animated, Easing, Linking, Platform, View } from 'react-native';
+import { Animated, Easing, Platform, View } from 'react-native';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
 import { EmptyState } from '@/components/EmptyState';
 import { FadeIn } from '@/components/FadeIn';
 import { Screen } from '@/components/Screen';
-import { WhatsAppPreview } from '@/components/WhatsAppPreview';
 import { useBookings } from '@/context/BookingsContext';
 import { bookingProblemLabel, formatPhone, useDb } from '@profecian/shared';
 import { useCatalog } from '@/data/services';
-import { useResponsive } from '@/hooks/useResponsive';
 import { colors, fonts, radius, shadows, spacing, createStyles } from '@/theme';
 import { formatAddress, formatDate, formatPrice } from '@/utils/format';
-import { buildAcknowledgement, openWhatsApp } from '@/utils/whatsapp';
 
 const useNativeDriver = Platform.OS !== 'web';
 
@@ -56,7 +53,6 @@ export default function SuccessScreen() {
   const { getBooking, loading } = useBookings();
   const db = useDb();
   const { getService } = useCatalog();
-  const { isDesktop } = useResponsive();
   const booking = getBooking(id);
 
   if (!booking) {
@@ -79,10 +75,6 @@ export default function SuccessScreen() {
   const issueTitle = bookingProblemLabel(db, booking);
   // Other visits placed from the same cart checkout (one booking per service).
   const extra = (more ?? '').split(',').map((x) => getBooking(x)).filter((b): b is NonNullable<typeof b> => !!b);
-  const message = buildAcknowledgement(db, booking);
-  // The acknowledgement the platform sent on the customer's behalf (stubbed WhatsApp API).
-  const ackUrl = db.notifications.find((n) => n.bookingId === booking.id && n.kind === 'booking_confirmed')?.whatsappUrl;
-  const time = new Date(booking.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const details: { icon: 'construct-outline' | 'calendar-outline' | 'time-outline' | 'location-outline' | 'call-outline'; label: string; value: string }[] = [
     { icon: 'construct-outline', label: 'Service', value: `${service?.name ?? ''} · ${issueTitle}` },
@@ -102,7 +94,7 @@ export default function SuccessScreen() {
               {extra.length ? `${extra.length + 1} Bookings Confirmed!` : 'Booking Confirmed!'}
             </AppText>
             <AppText variant="body" color={colors.muted} align="center" style={{ maxWidth: 440 }}>
-              Thanks, {booking.customerName.split(' ')[0]}! We’re assigning a verified professional — you’ll get their details on WhatsApp.
+              Thanks, {booking.customerName.split(' ')[0]}! We’re assigning a verified professional — you’ll get updates by SMS and WhatsApp.
             </AppText>
             <View style={styles.idPill}>
               <AppText style={styles.idLabel}>Booking ID</AppText>
@@ -127,8 +119,8 @@ export default function SuccessScreen() {
           </FadeIn>
         </View>
 
-        <View style={[styles.grid, isDesktop && styles.gridRow]}>
-          <FadeIn delay={350} style={[styles.card, isDesktop && { flex: 1 }]}>
+        <View style={styles.grid}>
+          <FadeIn delay={350} style={styles.card}>
             <AppText variant="h3">Booking details</AppText>
             {details.map((d) => (
               <View key={d.label} style={styles.detail}>
@@ -142,29 +134,11 @@ export default function SuccessScreen() {
               </View>
             ))}
             <View style={styles.totalRow}>
-              <AppText variant="label">Estimated total</AppText>
+              <AppText variant="label">Estimated total (Inc. GST)</AppText>
               <AppText style={styles.total}>{formatPrice(booking.price.total)}</AppText>
             </View>
           </FadeIn>
 
-          <FadeIn delay={450} style={[{ gap: spacing.md }, isDesktop && { flex: 1 }]}>
-            <View style={styles.waHeader}>
-              <Ionicons name="logo-whatsapp" size={20} color={colors.whatsappDark} />
-              <AppText variant="h3">WhatsApp acknowledgement</AppText>
-            </View>
-            <WhatsAppPreview message={message} time={time} />
-            <Button
-              label="Send confirmation to WhatsApp"
-              icon="logo-whatsapp"
-              variant="whatsapp"
-              fullWidth
-              size="lg"
-              onPress={() => (ackUrl ? Linking.openURL(ackUrl) : openWhatsApp(message))}
-            />
-            <AppText variant="small" align="center">
-              Sent to {formatPhone(booking.customerPhone)} on WhatsApp. Opens the chat with your booking details.
-            </AppText>
-          </FadeIn>
         </View>
 
         <View style={styles.actions}>
@@ -179,7 +153,7 @@ export default function SuccessScreen() {
 
 const styles = createStyles(() => ({
   extra: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.sm },
-  page: { paddingTop: spacing.xxxl, maxWidth: 1000 },
+  page: { paddingTop: spacing.xxxl, maxWidth: 640 },
   top: { alignItems: 'center', gap: spacing.xl, marginBottom: spacing.xxxl },
   checkWrap: { width: 110, height: 110, alignItems: 'center', justifyContent: 'center' },
   ring: { position: 'absolute', width: 96, height: 96, borderRadius: 48, backgroundColor: colors.success },
@@ -207,7 +181,6 @@ const styles = createStyles(() => ({
   idLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.muted },
   idValue: { fontFamily: fonts.extrabold, fontSize: 15, color: colors.primary, letterSpacing: 0.5 },
   grid: { gap: spacing.xxl },
-  gridRow: { flexDirection: 'row', alignItems: 'flex-start' },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
@@ -228,6 +201,5 @@ const styles = createStyles(() => ({
     borderTopColor: colors.border,
   },
   total: { fontFamily: fonts.extrabold, fontSize: 22, color: colors.primary },
-  waHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.md, marginTop: spacing.xxxl },
 }));

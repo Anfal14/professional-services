@@ -145,7 +145,7 @@ function BookingCard({ booking }: { booking: Booking }) {
       <View style={styles.footer}>
         <View>
           <AppText style={styles.price}>{formatPrice(booking.price.total)}</AppText>
-          <AppText variant="tiny" color={colors.muted}>{booking.status === 'cancelled' ? 'Not charged' : pay.label}</AppText>
+          <AppText variant="tiny" color={colors.muted}>{booking.status === 'cancelled' ? 'Not charged' : `Inc. GST · ${pay.label}`}</AppText>
         </View>
         <View style={styles.cta}>
           <AppText variant="label" color={needsPayment ? colors.danger : colors.primary}>
