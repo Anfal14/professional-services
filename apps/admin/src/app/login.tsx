@@ -1,9 +1,9 @@
 import Head from 'expo-router/head';
 import { Redirect } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { DEMO, ROLE_PERMISSIONS, useAction, useBackend, useSession } from '@profecian/shared';
-import { AppText, Banner, Button, Card, colors, fonts, gradients, radius, spacing, TextField } from '@profecian/ui';
+import { AppText, Banner, Button, Card, colors, fonts, gradients, radius, spacing, TextField, createStyles } from '@profecian/ui';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -73,11 +73,11 @@ export default function AdminLogin() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   page: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, backgroundColor: colors.background },
   card: { width: '100%', maxWidth: 440, gap: spacing.lg, padding: spacing.xxl, borderRadius: radius.xl },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   mark: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   word: { fontFamily: fonts.extrabold, fontSize: 20, color: colors.ink },
   roles: { gap: 4, paddingTop: spacing.xs },
-});
+}));

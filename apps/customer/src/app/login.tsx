@@ -1,6 +1,6 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { DEMO, formatPhone, useBackend } from '@profecian/shared';
 import { Banner, OtpLogin } from '@profecian/ui';
 import { AppText } from '@/components/AppText';
@@ -9,7 +9,7 @@ import { GoogleSignInButton } from '@/components/GoogleSignInButton';
 import { Screen } from '@/components/Screen';
 import { useCustomer } from '@/backend';
 import { useAuth } from '@/context/AuthContext';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, createStyles } from '@/theme';
 
 /** Stand-in for Google OAuth until a backend exists — supplies name/email only. */
 const GOOGLE_DEMO = { name: 'Aarav Sharma', email: 'aarav.sharma@example.com' };
@@ -78,8 +78,8 @@ export default function Login() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   page: { paddingVertical: spacing.xxxl, maxWidth: 520, gap: spacing.xl },
   orRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   orLine: { flex: 1, height: 1, backgroundColor: colors.border },
-});
+}));

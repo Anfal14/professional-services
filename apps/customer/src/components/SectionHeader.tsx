@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { colors, fonts, spacing } from '@/theme';
+import { Pressable, View } from 'react-native';
+import { colors, fonts, spacing, createStyles } from '@/theme';
 import { AppText } from './AppText';
 
 interface SectionHeaderProps {
@@ -36,7 +36,7 @@ export function SectionHeader({ eyebrow, title, subtitle, actionLabel, onAction,
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: spacing.xl, gap: 12 },
   center: { justifyContent: 'center' },
   text: { flexShrink: 1, gap: 4 },
@@ -44,4 +44,4 @@ const styles = StyleSheet.create({
   subtitle: { maxWidth: 560 },
   action: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 },
   actionText: { fontFamily: fonts.bold, fontSize: 14, color: colors.primary },
-});
+}));

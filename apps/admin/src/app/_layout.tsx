@@ -7,7 +7,8 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BackendProvider } from '@profecian/shared';
-import { colors } from '@profecian/ui';
+import { colors, ThemeProvider, useTheme } from '@profecian/ui';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { backend } from '@/backend';
 
 const Loading = () => (
@@ -25,9 +26,16 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <BackendProvider backend={backend} fallback={<Loading />}>
-        <StatusBar style="dark" />
-        <Slot />
+        <ThemeProvider storage={AsyncStorage} storageKey="@profecian/admin/theme/v1" fallback={<Loading />}>
+          <ThemedStatusBar />
+          <Slot />
+        </ThemeProvider>
       </BackendProvider>
     </SafeAreaProvider>
   );
+}
+
+function ThemedStatusBar() {
+  const { scheme } = useTheme();
+  return <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />;
 }

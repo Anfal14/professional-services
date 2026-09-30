@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { computeBreakdown, formatINR, ROLE_PERMISSIONS, useAction, useBackend, useDb } from '@profecian/shared';
-import { AppText, Banner, Button, confirmAction, KeyValue, spacing, TextField } from '@profecian/ui';
+import { AppText, Banner, Button, confirmAction, KeyValue, spacing, TextField, AppearanceSettings } from '@profecian/ui';
 import { Page, Panel, Row } from '@/components/admin';
 
 export default function Settings() {
@@ -42,6 +42,9 @@ export default function Settings() {
           <Button label="Save pricing rules" onPress={submit} loading={save.pending} />
         </Panel>
         <View style={{ gap: spacing.lg }}>
+          <Panel title="Theme">
+            <AppearanceSettings card={false} />
+          </Panel>
           <Panel title="Roles & access">
             {Object.entries(ROLE_PERMISSIONS).map(([role, perms]) => (
               <KeyValue key={role} label={role.replace('_', ' ')} value={perms.join(', ')} />

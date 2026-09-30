@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import type { Issue } from '@/data/services';
-import { colors, fonts, radius, shadows, spacing } from '@/theme';
+import { colors, fonts, radius, shadows, spacing, createStyles } from '@/theme';
 import { formatPrice } from '@/utils/format';
 import { AppText } from './AppText';
 import { PressableScale } from './PressableScale';
@@ -18,9 +18,10 @@ export function IssueCard({ issue, selected, onPress }: IssueCardProps) {
       onPress={onPress}
       hoverLift
       style={[styles.card, selected && styles.selected]}
-      accessibilityRole="radio"
+      accessibilityRole="checkbox"
       accessibilityState={{ checked: !!selected }}
       accessibilityLabel={`${issue.title}, ${formatPrice(issue.price)}, ${issue.duration}`}
+      accessibilityHint={selected ? 'Removes it from your cart' : 'Adds it to your cart'}
     >
       <View style={[styles.icon, selected && styles.iconSelected]}>
         <Ionicons name={issue.icon} size={22} color={selected ? colors.white : colors.primary} />
@@ -40,13 +41,13 @@ export function IssueCard({ issue, selected, onPress }: IssueCardProps) {
         </View>
       </View>
       <View style={[styles.check, selected && styles.checkSelected]}>
-        {selected ? <Ionicons name="checkmark" size={14} color={colors.white} /> : <Ionicons name="add" size={16} color={colors.primary} />}
+        {selected ? <Ionicons name="checkmark" size={16} color={colors.white} /> : <Ionicons name="add" size={18} color={colors.primary} />}
       </View>
     </PressableScale>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -58,7 +59,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     ...shadows.sm,
   },
-  selected: { borderColor: colors.primary, backgroundColor: '#FBF9FF' },
+  selected: { borderColor: colors.primary, backgroundColor: colors.selectedBg },
   icon: {
     width: 48,
     height: 48,
@@ -84,4 +85,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-});
+}));

@@ -3,7 +3,7 @@ import { router, usePathname } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUpcomingCount } from '@/context/BookingsContext';
-import { colors, fonts, layout, shadows } from '@/theme';
+import { colors, fonts, layout, shadows, createStyles } from '@/theme';
 import { AppText } from './AppText';
 import { NavAvatar } from './NavAvatar';
 import { BOTTOM_NAV_ITEMS, isActive } from './navigation';
@@ -47,7 +47,7 @@ export function BottomNav() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   wrap: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 3,
     borderWidth: 1.5,
-    borderColor: colors.white,
+    borderColor: colors.surface,
   },
   badgeText: { fontFamily: fonts.bold, fontSize: 9, color: colors.white, lineHeight: 11 },
-});
+}));

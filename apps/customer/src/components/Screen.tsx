@@ -10,7 +10,7 @@ import {
 import Head from 'expo-router/head';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useResponsive } from '@/hooks/useResponsive';
-import { colors, shadows, spacing } from '@/theme';
+import { colors, shadows, spacing, createStyles } from '@/theme';
 import { BottomNav } from './BottomNav';
 import { Container } from './Container';
 import { Footer } from './Footer';
@@ -59,7 +59,8 @@ export const Screen = forwardRef<ScrollView, ScreenProps>(function Screen(
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.flex}>{children}</View>
-          {footer && <Footer />}
+          {/* The footer is a website element — the native app uses the tab bar and account menu. */}
+          {footer && Platform.OS === 'web' && <Footer />}
         </ScrollView>
         {actionBar ? (
           <View style={[styles.actionBar, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
@@ -72,7 +73,7 @@ export const Screen = forwardRef<ScrollView, ScreenProps>(function Screen(
   );
 });
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   root: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   content: { flexGrow: 1 },
@@ -83,4 +84,4 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     ...shadows.lg,
   },
-});
+}));

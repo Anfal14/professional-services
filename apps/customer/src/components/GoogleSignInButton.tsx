@@ -1,5 +1,5 @@
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { colors, fonts, radius } from '@/theme';
+import { ActivityIndicator, View } from 'react-native';
+import { colors, fonts, radius, createStyles } from '@/theme';
 import { AppText } from './AppText';
 import { GoogleMark } from './GoogleMark';
 import { PressableScale } from './PressableScale';
@@ -38,7 +38,7 @@ export function GoogleSignInButton({ onPress, loading, disabled }: GoogleSignInB
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   button: {
     alignSelf: 'stretch',
     height: 48,
@@ -50,5 +50,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   inner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  label: { fontFamily: fonts.semibold, fontSize: 15, color: colors.ink },
-});
+  label: { fontFamily: fonts.semibold, fontSize: 15, color: '#1F1F1F' },
+}));

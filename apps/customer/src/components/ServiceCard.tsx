@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import type { Service } from '@/data/services';
-import { colors, fonts, gradients, radius, shadows, spacing } from '@/theme';
+import { colors, fonts, gradients, radius, shadows, spacing, createStyles } from '@/theme';
 import { formatPrice } from '@/utils/format';
 import { AppText } from './AppText';
 import { PressableScale } from './PressableScale';
@@ -61,7 +61,7 @@ export function ServiceCard({ service, compact }: ServiceCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
@@ -97,4 +97,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

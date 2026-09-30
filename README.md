@@ -29,6 +29,8 @@ Checks: `npm run typecheck`, `npm run lint`. Native: `npx expo start` inside an 
 
 OTP for every phone login: **123456**.
 
+Themes: each app has purple or dark blue, in light, dark or system mode (customer: Settings; vendor: Profile; admin: top-bar theme button or Settings).
+
 ## Mock backend limits
 
 - The three apps **do not share state** — each starts from the same deterministic seed and keeps its own copy. A booking made in the customer app won't appear in the admin app. Demo-only "simulate" buttons stand in for the other side (e.g. "Simulate next update" on a customer booking, "Simulate admin approval" in vendor onboarding).

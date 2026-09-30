@@ -6,7 +6,7 @@ import {
   type PressableProps, type StyleProp, type TextInputProps, type TextProps, type TextStyle, type ViewStyle,
 } from 'react-native';
 import type { Tone } from '@profecian/shared';
-import { colors, fonts, gradients, radius, shadows, spacing, toneColors, type as typeScale } from './theme';
+import { colors, fonts, gradients, radius, shadows, spacing, toneColors, type as typeScale, createStyles } from './theme';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 /** Catalogue icons are stored as plain strings in @profecian/shared. */
@@ -88,17 +88,17 @@ const buttonSizes: Record<ButtonSize, { height: number; px: number; font: number
   lg: { height: 54, px: 22, font: 16, icon: 20 },
 };
 
-const buttonPalette: Record<ButtonVariant, { bg: string; fg: string; border?: string }> = {
+const buttonPalette = (): Record<ButtonVariant, { bg: string; fg: string; border?: string }> => ({
   primary: { bg: colors.primary, fg: colors.white },
   secondary: { bg: colors.primarySoft, fg: colors.primary },
   outline: { bg: 'transparent', fg: colors.ink, border: colors.borderStrong },
   ghost: { bg: 'transparent', fg: colors.primary },
   whatsapp: { bg: colors.whatsapp, fg: colors.white },
-  dark: { bg: colors.ink, fg: colors.white },
-  light: { bg: colors.white, fg: colors.ink },
+  dark: { bg: colors.ink, fg: colors.inverse },
+  light: { bg: colors.white, fg: colors.night },
   danger: { bg: colors.dangerSoft, fg: colors.danger },
   success: { bg: colors.success, fg: colors.white },
-};
+});
 
 export function Button({ label, onPress, variant = 'primary', size = 'md', icon, iconRight, loading, disabled, fullWidth, style, accessibilityHint }: {
   label: string;
@@ -114,7 +114,7 @@ export function Button({ label, onPress, variant = 'primary', size = 'md', icon,
   accessibilityHint?: string;
 }) {
   const s = buttonSizes[size];
-  const p = buttonPalette[variant];
+  const p = buttonPalette()[variant];
   const inactive = disabled || loading;
   const content = (
     <View style={[styles.btnInner, { height: s.height, paddingHorizontal: s.px }]}>
@@ -358,7 +358,7 @@ export function Toggle({ value, onChange, label, disabled }: { value: boolean; o
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   btn: { borderRadius: radius.md, overflow: 'hidden', alignSelf: 'flex-start' },
   gradient: { borderRadius: radius.md },
   btnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
@@ -391,8 +391,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
   },
   fieldMulti: { alignItems: 'flex-start', paddingVertical: 12 },
-  fieldFocused: { borderColor: colors.primary, backgroundColor: '#FDFCFF' },
-  fieldError: { borderColor: colors.danger, backgroundColor: '#FFFBFB' },
+  fieldFocused: { borderColor: colors.primary, backgroundColor: colors.inputBg },
+  fieldError: { borderColor: colors.danger, backgroundColor: colors.inputErrorBg },
   prefix: { paddingRight: 10, borderRightWidth: 1, borderRightColor: colors.border },
   prefixText: { fontFamily: fonts.semibold, fontSize: 15, color: colors.ink },
   input: { flex: 1, fontFamily: fonts.medium, fontSize: 15, color: colors.ink, paddingVertical: 11, minWidth: 0, outlineStyle: 'none' } as object,
@@ -409,4 +409,4 @@ const styles = StyleSheet.create({
   toggleOn: { backgroundColor: colors.success },
   knob: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.white, ...shadows.sm },
   knobOn: { alignSelf: 'flex-end' },
-});
+}));

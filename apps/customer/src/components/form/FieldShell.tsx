@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { colors, fonts } from '@/theme';
+import { View } from 'react-native';
+import { colors, fonts, createStyles } from '@/theme';
 import { AppText } from '../AppText';
 
 interface FieldShellProps {
@@ -37,11 +37,11 @@ export function FieldShell({ label, optional, required, error, hint, children }:
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   wrap: { gap: 8 },
   required: { color: colors.danger, fontFamily: fonts.bold },
   optional: { color: colors.subtle, fontFamily: fonts.medium, fontSize: 13 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   error: { fontFamily: fonts.medium, fontSize: 12.5, color: colors.danger, flexShrink: 1 },
   hint: { fontFamily: fonts.regular, fontSize: 12.5, color: colors.muted },
-});
+}));

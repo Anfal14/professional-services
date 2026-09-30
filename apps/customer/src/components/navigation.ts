@@ -25,6 +25,6 @@ export const BOTTOM_NAV_ITEMS: NavItem[] = NAV_ITEMS.filter(
 
 export function isActive(pathname: string, href: string): boolean {
   if (href === '/') return pathname === '/';
-  if (href === '/services') return pathname === '/services' || pathname.startsWith('/service/') || pathname.startsWith('/book/');
+  if (href === '/services') return pathname === '/services' || pathname.startsWith('/service/');
   return pathname === href || pathname.startsWith(`${href}/`);
 }

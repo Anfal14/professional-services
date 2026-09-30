@@ -2,12 +2,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, usePathname } from 'expo-router';
 import Head from 'expo-router/head';
 import { useMemo, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { can, useBackend, useSnapshot, type AdminPermission, type AdminUser } from '@profecian/shared';
 import {
-  AppText, Avatar, Badge, colors, EmptyState, fonts, IconButton, radius, shadows, spacing, type IconName, type WebPressableState,
-} from '@profecian/ui';
+  AppText, Avatar, Badge, colors, EmptyState, fonts, IconButton, radius, shadows, spacing, type IconName, type WebPressableState, createStyles, AppearanceSettings, Sheet, useTheme } from '@profecian/ui';
 
 /* ───────────── Session ───────────── */
 
@@ -42,6 +41,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
   const wide = width >= 1024;
   const [menuOpen, setMenuOpen] = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
+  const { scheme } = useTheme();
   const unread = db.notifications.filter((n) => n.audience === 'admin' && !n.read).length;
   const items = NAV.filter((n) => can(admin, n.perm));
 
@@ -92,6 +93,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <View style={styles.topbar}>
           {!wide ? <IconButton icon={menuOpen ? 'close' : 'menu'} label="Menu" onPress={() => setMenuOpen((o) => !o)} /> : null}
           {!wide ? <Brand compact /> : <View style={{ flex: 1 }} />}
+          <IconButton icon={scheme === 'dark' ? 'moon-outline' : 'sunny-outline'} label="Theme" onPress={() => setThemeOpen(true)} />
           <IconButton icon="notifications-outline" label="Notifications" badge={unread} onPress={() => router.navigate('/notifications' as never)} />
         </View>
         {!wide && menuOpen ? (
@@ -102,6 +104,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
         ) : null}
         <View style={{ flex: 1 }}>{children}</View>
       </View>
+      <Sheet visible={themeOpen} onClose={() => setThemeOpen(false)} title="Theme" width={420}>
+        <AppearanceSettings card={false} />
+      </Sheet>
     </View>
   );
 }
@@ -170,10 +175,10 @@ export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { valu
         const on = t.value === value;
         return (
           <Pressable key={t.value} onPress={() => onChange(t.value)} accessibilityRole="tab" accessibilityState={{ selected: on }} style={[styles.tab, on && styles.tabOn]}>
-            <AppText style={[styles.tabText, on && { color: colors.white }]}>{t.label}</AppText>
+            <AppText style={[styles.tabText, on && { color: colors.inverse }]}>{t.label}</AppText>
             {t.count != null ? (
               <View style={[styles.tabCount, on && { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                <AppText style={[styles.tabCountText, on && { color: colors.white }]}>{t.count}</AppText>
+                <AppText style={[styles.tabCountText, on && { color: colors.inverse }]}>{t.count}</AppText>
               </View>
             ) : null}
           </Pressable>
@@ -303,7 +308,7 @@ export function Cell({ title, sub }: { title: string; sub?: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   root: { flex: 1, flexDirection: 'row', backgroundColor: colors.background },
   sidebar: { width: 248, backgroundColor: colors.surface, borderRightWidth: 1, borderRightColor: colors.border },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: spacing.lg },
@@ -338,4 +343,4 @@ const styles = StyleSheet.create({
   cell: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 10 },
   right: { justifyContent: 'flex-end' },
   pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md },
-});
+}));

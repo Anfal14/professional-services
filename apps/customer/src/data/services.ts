@@ -142,3 +142,58 @@ export const testimonials = [
     service: 'Electrician',
   },
 ];
+
+/** The "Other / Not sure" option shown as a selectable issue, priced as the visit it books. */
+export function otherIssue(service: Service): Issue {
+  const booked = resolveIssue(service, OTHER_ISSUE_ID);
+  return {
+    id: OTHER_ISSUE_ID,
+    title: 'Other / Not sure',
+    description: 'Our expert will inspect and quote on the spot',
+    price: booked?.price ?? service.startingPrice,
+    duration: booked?.duration ?? '30 mins',
+    icon: 'help-circle-outline',
+    pricingModel: 'inspection',
+  };
+}
+
+export interface CartLine {
+  issueId: string;
+  issue: Issue;
+  /** Problem type actually booked ("Not sure" resolves to the inspection visit). */
+  problemTypeId: string;
+}
+
+export interface CartGroup {
+  service: Service;
+  lines: CartLine[];
+  /** Distinct problem types to book in one visit. */
+  problemTypeIds: string[];
+  subtotal: number;
+  /** Some prices are "starting at" / inspection — final quote after the visit. */
+  estimate: boolean;
+}
+
+/** Groups cart items by service (one visit per service), dropping anything no longer offered. */
+export function groupCart(services: Service[], items: { serviceId: string; issueId: string }[]): CartGroup[] {
+  const groups: CartGroup[] = [];
+  for (const item of items) {
+    const service = services.find((s) => s.id === item.serviceId);
+    if (!service) continue;
+    const issue = item.issueId === OTHER_ISSUE_ID ? otherIssue(service) : service.issues.find((i) => i.id === item.issueId);
+    const booked = resolveIssue(service, item.issueId);
+    if (!issue || !booked) continue;
+    let group = groups.find((g) => g.service.id === service.id);
+    if (!group) {
+      group = { service, lines: [], problemTypeIds: [], subtotal: 0, estimate: false };
+      groups.push(group);
+    }
+    group.lines.push({ issueId: item.issueId, issue, problemTypeId: booked.id });
+    if (!group.problemTypeIds.includes(booked.id)) {
+      group.problemTypeIds.push(booked.id);
+      group.subtotal += booked.price;
+    }
+    if (issue.pricingModel !== 'fixed') group.estimate = true;
+  }
+  return groups;
+}

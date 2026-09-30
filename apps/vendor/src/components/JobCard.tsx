@@ -1,24 +1,23 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { View } from 'react-native';
-import { BOOKING_STATUS, formatDate, formatINR, toISODate, useDb, type Booking } from '@profecian/shared';
-import { AppText, asIcon, Badge, Card, colors, radius, spacing } from '@profecian/ui';
+import { BOOKING_STATUS, bookingProblemLabel, formatDate, formatINR, toISODate, useDb, type Booking } from '@profecian/shared';
+import { AppText, asIcon, Badge, Card, colors, radius, spacing, tintTile } from '@profecian/ui';
 
 export function JobCard({ job }: { job: Booking }) {
   const db = useDb();
   const category = db.categories.find((c) => c.id === job.categoryId);
-  const problem = db.problemTypes.find((p) => p.id === job.problemTypeId);
   // "Professional assigned" is customer wording; to the vendor it's a new job.
   const s = job.status === 'assigned' ? { label: 'New job', tone: 'warning' as const } : BOOKING_STATUS[job.status];
   const today = job.date === toISODate(new Date());
   return (
     <Card onPress={() => router.push(`/job/${job.id}`)} style={{ gap: spacing.md }}>
       <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-        <View style={{ width: 44, height: 44, borderRadius: radius.md, backgroundColor: category?.tint ?? colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name={asIcon(category?.icon ?? 'construct-outline')} size={22} color={colors.ink} />
+        <View style={{ width: 44, height: 44, borderRadius: radius.md, backgroundColor: tintTile(category?.tint).bg, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name={asIcon(category?.icon ?? 'construct-outline')} size={22} color={tintTile(category?.tint).fg} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <AppText variant="label" numberOfLines={1}>{problem?.name ?? category?.name}</AppText>
+          <AppText variant="label" numberOfLines={1}>{bookingProblemLabel(db, job) || category?.name}</AppText>
           <AppText variant="small" numberOfLines={1}>{category?.name} · {job.code}</AppText>
         </View>
         <Badge label={s.label} tone={s.tone} />

@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 import { formatPhone, isValidPhone, TEST_OTP } from '@profecian/shared';
 import { AppText, Banner, Button, TextField } from './primitives';
-import { colors, fonts, radius, spacing } from './theme';
+import { colors, fonts, radius, spacing, createStyles } from './theme';
 
 interface OtpLoginProps {
   /** Heading shown on the phone step */
@@ -157,18 +157,18 @@ export function OtpLogin({ title, subtitle, requestOtp, verifyOtp, initialPhone 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   wrap: { gap: spacing.xl, width: '100%', maxWidth: 440, alignSelf: 'center' },
   boxes: { flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   box: {
     flex: 1, maxWidth: 56, height: 58, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border,
     backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
   },
-  boxActive: { borderColor: colors.primary, backgroundColor: '#FDFCFF' },
+  boxActive: { borderColor: colors.primary, backgroundColor: colors.inputBg },
   boxError: { borderColor: colors.danger },
   digit: { fontFamily: fonts.extrabold, fontSize: 22, color: colors.ink },
   hiddenInput: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.01, color: 'transparent' },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   error: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger },
   row: { flexDirection: 'row', justifyContent: 'space-between' },
-});
+}));

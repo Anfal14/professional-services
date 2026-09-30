@@ -1,4 +1,4 @@
-import type { Booking, PriceBreakdown, ProblemType, ServiceCategory, PlatformSettings } from './types';
+import type { Booking, Database, PriceBreakdown, ProblemType, ServiceCategory, PlatformSettings } from './types';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -30,6 +30,20 @@ export function breakdownFor(
 ): PriceBreakdown {
   const rate = category.commissionRate ?? settings.defaultCommissionRate;
   return computeBreakdown(problem.price, rate, settings.taxRate);
+}
+
+/** Names of every problem in a booking (older bookings have just `problemTypeId`). */
+export function bookingProblemNames(db: Pick<Database, 'problemTypes'>, b: Pick<Booking, 'problemTypeId' | 'items'>): string[] {
+  if (b.items?.length) return b.items.map((i) => i.name);
+  const p = db.problemTypes.find((x) => x.id === b.problemTypeId);
+  return p ? [p.name] : [];
+}
+
+/** "Fan repair", "Fan repair + Switch repair" or "Fan repair + 2 more". */
+export function bookingProblemLabel(db: Pick<Database, 'problemTypes'>, b: Pick<Booking, 'problemTypeId' | 'items'>): string {
+  const n = bookingProblemNames(db, b);
+  if (n.length <= 2) return n.join(" + ");
+  return `${n[0]} + ${n.length - 1} more`;
 }
 
 export const PRICING_MODEL_LABEL: Record<ProblemType['pricingModel'], string> = {

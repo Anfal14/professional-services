@@ -2,13 +2,13 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { Linking, View } from 'react-native';
 import {
-  BOOKING_STATUS, canCustomerModify, formatDate, formatDateTime, formatINR, formatPhone, ONLINE_METHODS, PAYMENT_METHOD_LABEL, PAYMENT_STATUS,
+  bookingProblemLabel, bookingProblemNames, BOOKING_STATUS, canCustomerModify, isSlotAvailable, formatDate, formatDateTime, formatINR, formatPhone, ONLINE_METHODS, PAYMENT_METHOD_LABEL, PAYMENT_STATUS,
   suggestVendors, TRACKING_STEPS, useAction, useBackend, useDb, VENDOR_NEXT, type Booking, type PaymentMethod,
 } from '@profecian/shared';
 import {
-  asIcon, Banner, Button as UiButton, Card, ChipGroup, DateSlotPicker, Divider, KeyValue, PhotoPicker, Sheet, StarInput, Stars, TextField, Timeline, Toggle,
+  asIcon, Banner, hasOpenSlots, Button as UiButton, Card, ChipGroup, DateSlotPicker, Divider, KeyValue, PhotoPicker, Sheet, StarInput, Stars, TextField, Timeline, Toggle,
 } from '@profecian/ui';
 import { AppText } from '@/components/AppText';
 import { Container } from '@/components/Container';
@@ -18,8 +18,8 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { useCustomer } from '@/backend';
 import { useCatalog } from '@/data/services';
 import { useResponsive } from '@/hooks/useResponsive';
-import { colors, fonts, radius, spacing } from '@/theme';
-import { openWhatsApp } from '@/utils/whatsapp';
+import { colors, fonts, radius, spacing, createStyles } from '@/theme';
+import { APP_CONFIG } from '@/config';
 
 const STEP_LABEL: Record<string, string> = {
   pending_assignment: 'Booked',
@@ -52,7 +52,7 @@ export default function BookingDetail() {
   }
 
   const service = getService(booking.categoryId);
-  const problem = db.problemTypes.find((p) => p.id === booking.problemTypeId);
+  const problemLabel = bookingProblemLabel(db, booking);
   const vendor = booking.vendorId ? db.vendors.find((v) => v.id === booking.vendorId) : undefined;
   const review = booking.reviewId ? db.reviews.find((r) => r.id === booking.reviewId) : undefined;
   const cancelled = booking.status === 'cancelled';
@@ -102,10 +102,14 @@ export default function BookingDetail() {
     <View style={{ gap: spacing.lg }}>
       <Card style={{ gap: 4 }}>
         <AppText variant="h3" style={{ marginBottom: 6 }}>Payment</AppText>
-        <KeyValue label={problem?.name ?? 'Service'} value={formatINR(booking.price.serviceAmount)} />
-        <KeyValue label={`GST (${Math.round((booking.price.tax / Math.max(1, booking.price.serviceAmount)) * 100)}%)`} value={formatINR(booking.price.tax)} />
+        {bookingProblemNames(db, booking).map((name) => (
+          <View key={name} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="checkmark-circle-outline" size={16} color={colors.muted} />
+            <AppText variant="bodyMedium">{name}</AppText>
+          </View>
+        ))}
         <Divider style={{ marginVertical: 6 }} />
-        <KeyValue label="Total" value={formatINR(booking.price.total)} strong />
+        <KeyValue label="Total (Inc. GST)" value={formatINR(booking.price.total)} strong />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
           <AppText variant="small">{cancelled ? 'Not charged' : `${PAYMENT_STATUS[booking.payment.status].label}${booking.payment.method ? ` · ${PAYMENT_METHOD_LABEL[booking.payment.method]}` : ''}`}</AppText>
         </View>
@@ -134,7 +138,7 @@ export default function BookingDetail() {
       <Card style={{ gap: spacing.md }}>
         <AppText variant="h3">Need help?</AppText>
         <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
-          <UiButton label="WhatsApp support" size="sm" variant="whatsapp" icon="logo-whatsapp" onPress={() => openWhatsApp(`Hi Profecian, I need help with booking ${booking.code}.`)} />
+          <UiButton label={`Call ${APP_CONFIG.supportPhone}`} size="sm" icon="call-outline" onPress={() => Linking.openURL(`tel:${APP_CONFIG.supportPhone.replace(/s/g, '')}`)} />
           {!cancelled ? <UiButton label="Report an issue" size="sm" variant="outline" icon="flag-outline" onPress={() => setSheet('complaint')} /> : null}
         </View>
         {db.complaints.filter((c) => c.bookingId === booking.id).map((c) => (
@@ -156,7 +160,7 @@ export default function BookingDetail() {
           {service ? <Image source={service.image} style={[styles.headImg, isMobile && { width: 56, height: 56 }]} contentFit="cover" /> : null}
           <View style={{ flex: 1, gap: 4, minWidth: 0 }}>
             <AppText variant={isMobile ? 'h2' : 'h1'} numberOfLines={2}>{service?.name}</AppText>
-            <AppText variant="body" color={colors.muted}>{problem?.name} · #{booking.code}</AppText>
+            <AppText variant="body" color={colors.muted}>{problemLabel} · #{booking.code}</AppText>
             {isMobile ? <StatusBadge status={booking.status} /> : null}
           </View>
           {!isMobile ? <StatusBadge status={booking.status} /> : null}
@@ -342,7 +346,7 @@ function PaySheet({ booking, onClose }: { booking: Booking; onClose: () => void 
 
 function MethodRow({ icon, title, hint, selected, onPress }: { icon: string; title: string; hint: string; selected: boolean; onPress: () => void }) {
   return (
-    <Card onPress={onPress} style={[{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md }, selected && { borderColor: colors.primary, backgroundColor: '#FBF9FF' }]}>
+    <Card onPress={onPress} style={[{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md }, selected && { borderColor: colors.primary, backgroundColor: colors.selectedBg }]}>
       <Ionicons name={asIcon(icon)} size={22} color={colors.primary} />
       <View style={{ flex: 1 }}>
         <AppText variant="label">{title}</AppText>
@@ -355,15 +359,17 @@ function MethodRow({ icon, title, hint, selected, onPress }: { icon: string; tit
 
 function RescheduleSheet({ booking, onClose }: { booking: Booking; onClose: () => void }) {
   const backend = useBackend();
-  const [date, setDate] = useState<string | undefined>();
-  const [slot, setSlot] = useState<string | undefined>();
+  // Start from the current visit so the last selection is kept (if it is still bookable).
+  const [date, setDate] = useState<string | undefined>(() => (hasOpenSlots(booking.date) ? booking.date : undefined));
+  const [slot, setSlot] = useState<string | undefined>(() => (isSlotAvailable(booking.date, booking.slot) ? booking.slot : undefined));
   const save = useAction(backend.customer.rescheduleBooking);
+  const unchanged = date === booking.date && slot === booking.slot;
   return (
     <Sheet visible onClose={onClose} title="Reschedule visit" width={640}
-      footer={<UiButton label="Confirm new time" fullWidth disabled={!date || !slot} loading={save.pending} onPress={async () => { if (date && slot && (await save.run(booking.id, date, slot))) onClose(); }} />}>
+      footer={<UiButton label="Confirm new time" fullWidth disabled={!date || !slot || unchanged} loading={save.pending} onPress={async () => { if (date && slot && (await save.run(booking.id, date, slot))) onClose(); }} />}>
       <AppText variant="small">Currently {formatDate(booking.date)}, {booking.slot}. Your professional will be informed.</AppText>
       {save.error ? <Banner tone="danger" icon="alert-circle" title={save.error} /> : null}
-      <DateSlotPicker date={date} slot={slot} onDate={(d) => { setDate(d); setSlot(undefined); }} onSlot={setSlot} />
+      <DateSlotPicker date={date} slot={slot} onDate={setDate} onSlot={setSlot} />
     </Sheet>
   );
 }
@@ -400,7 +406,7 @@ function ComplaintSheet({ booking, onClose }: { booking: Booking; onClose: () =>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   page: { paddingTop: spacing.xxl, gap: spacing.xl, maxWidth: 1100 },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, flexWrap: 'wrap' },
   headImg: { width: 72, height: 72, borderRadius: radius.lg },
@@ -411,5 +417,5 @@ const styles = StyleSheet.create({
   steps: { flexDirection: 'row', gap: 4 },
   stepBar: { height: 6, alignSelf: 'stretch', borderRadius: 3 },
   stepLabel: { fontFamily: fonts.semibold, fontSize: 10.5, color: colors.subtle, textAlign: 'center' },
-});
+}));
 

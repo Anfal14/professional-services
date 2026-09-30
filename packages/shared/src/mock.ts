@@ -12,7 +12,7 @@
 import { distanceKm, jitterNear } from './geo';
 import { isValidPhone, normalizePhone, scheduledAt, toISODate } from './format';
 import { notifyFor } from './notify';
-import { breakdownFor, computeVendorWallet } from './pricing';
+import { breakdownFor, computeBreakdown, computeVendorWallet } from './pricing';
 import { sandboxOtp, sandboxPayments, type OtpProvider, type PaymentGateway, type PaymentRequest } from './providers';
 import { createSeedDatabase, DB_VERSION, DEMO } from './seed';
 import { canCustomerModify, VENDOR_NEXT } from './status';
@@ -227,24 +227,35 @@ export function createMockBackend(options: BackendOptions) {
       return saved;
     },
 
+    async deleteAddress(customerId: ID, addressId: ID): Promise<void> {
+      await wait();
+      commit((d) => ({
+        ...d,
+        customers: replace(d.customers, customerId, (c) => ({ ...c, addresses: c.addresses.filter((a) => a.id !== addressId) })),
+      }));
+    },
+
     async createBooking(input: {
-      customerId: ID; categoryId: ID; problemTypeId: ID; date: string; slot: string;
+      customerId: ID; categoryId: ID; problemTypeIds: ID[]; date: string; slot: string;
       address: Omit<Address, 'id'> & { id?: ID }; contactName: string; contactPhone: string; notes?: string;
     }): Promise<Booking> {
       await wait();
       const d = db();
       const category = d.categories.find((c) => c.id === input.categoryId && c.enabled);
-      const problem = d.problemTypes.find((p) => p.id === input.problemTypeId && p.categoryId === input.categoryId && p.enabled);
-      if (!category || !problem) throw new ApiError('This service is currently unavailable');
+      const ids = [...new Set(input.problemTypeIds)];
+      const problems = ids.map((id) => d.problemTypes.find((p) => p.id === id && p.categoryId === input.categoryId && p.enabled));
+      if (!category || !problems.length || problems.some((p) => !p)) throw new ApiError('This service is currently unavailable');
+      const items = (problems as ProblemType[]).map((p) => ({ problemTypeId: p.id, name: p.name, price: p.price }));
+      const serviceAmount = items.reduce((sum, i) => sum + i.price, 0);
       if (!isValidPhone(input.contactPhone)) throw new ApiError('Enter a valid contact number');
       if (scheduledAt(input.date, input.slot).getTime() < Date.now()) throw new ApiError('Please choose a future time slot');
       const address = await customer.saveAddress(input.customerId, input.address);
       const b: Booking = {
         id: uid('bkg'), code: bookingCode(), customerId: input.customerId,
         customerName: input.contactName.trim(), customerPhone: normalizePhone(input.contactPhone),
-        categoryId: category.id, problemTypeId: problem.id, date: input.date, slot: input.slot, address,
+        categoryId: category.id, problemTypeId: items[0].problemTypeId, items, date: input.date, slot: input.slot, address,
         notes: input.notes?.trim() || undefined, status: 'pending_assignment',
-        price: breakdownFor(problem, category, d.settings), payment: { status: 'unpaid' }, proofPhotos: [],
+        price: computeBreakdown(serviceAmount, category.commissionRate ?? d.settings.defaultCommissionRate, d.settings.taxRate), payment: { status: 'unpaid' }, proofPhotos: [],
         timeline: [event('pending_assignment', 'customer', 'Booking placed')], createdAt: new Date().toISOString(),
       };
       commit((x) => ({ ...x, bookings: [b, ...x.bookings] }), notifyFor.bookingCreated(d, b));
@@ -519,7 +530,7 @@ export function createMockBackend(options: BackendOptions) {
     },
 
     async deleteProblemType(id: ID) {
-      if (db().bookings.some((b) => b.problemTypeId === id)) throw new ApiError('This problem type has bookings — disable it instead');
+      if (db().bookings.some((b) => b.problemTypeId === id || b.items?.some((i) => i.problemTypeId === id))) throw new ApiError('This problem type has bookings — disable it instead');
       commit((d) => ({ ...d, problemTypes: d.problemTypes.filter((p) => p.id !== id) }));
     },
 

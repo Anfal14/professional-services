@@ -4,7 +4,7 @@ import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { APP_CONFIG } from '@/config';
 import { useCatalog } from '@/data/services';
 import { useResponsive } from '@/hooks/useResponsive';
-import { colors, fonts, spacing } from '@/theme';
+import { colors, fonts, spacing, createStyles } from '@/theme';
 import { openWhatsApp } from '@/utils/whatsapp';
 import { AppText } from './AppText';
 import { Container } from './Container';
@@ -55,6 +55,9 @@ export function Footer() {
                 <AppText style={styles.link}>{n.label}</AppText>
               </Pressable>
             ))}
+            <Pressable onPress={() => router.navigate('/settings')}>
+              <AppText style={styles.link}>Settings & theme</AppText>
+            </Pressable>
           </View>
 
           <View style={styles.col}>
@@ -78,8 +81,8 @@ export function Footer() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { backgroundColor: colors.ink, paddingTop: spacing.huge, paddingBottom: spacing.xxl, marginTop: spacing.huge },
+const styles = createStyles(() => ({
+  wrap: { backgroundColor: colors.night, paddingTop: spacing.huge, paddingBottom: spacing.xxl, marginTop: spacing.huge },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xxxl, justifyContent: 'space-between' },
   gridMobile: { gap: spacing.xxl },
   brand: { maxWidth: 320, gap: spacing.lg, flexBasis: 280, flexGrow: 1 },
@@ -107,4 +110,4 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   copy: { fontFamily: fonts.regular, fontSize: 12, color: '#8E8EA6' },
-});
+}));

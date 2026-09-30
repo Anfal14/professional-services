@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, View } from 'react-native';
-import { colors, fonts, radius, shadows } from '@/theme';
+import { View } from 'react-native';
+import { colors, fonts, radius, shadows, createStyles } from '@/theme';
 import { AppText } from './AppText';
 
 interface WhatsAppPreviewProps {
@@ -42,7 +42,7 @@ export function WhatsAppPreview({ message, time }: WhatsAppPreviewProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   wrap: { borderRadius: radius.xl, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, ...shadows.md },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.whatsappDark, paddingHorizontal: 14, paddingVertical: 12 },
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
   bubble: {
     alignSelf: 'flex-start',
     maxWidth: '92%',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white,
     borderRadius: 12,
     borderTopLeftRadius: 2,
     paddingHorizontal: 12,
@@ -71,10 +71,10 @@ const styles = StyleSheet.create({
     height: 0,
     borderTopWidth: 10,
     borderLeftWidth: 8,
-    borderTopColor: colors.surface,
+    borderTopColor: colors.white,
     borderLeftColor: 'transparent',
   },
   message: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 21, color: '#111B21' },
   meta: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', gap: 3, marginTop: 2 },
   time: { fontFamily: fonts.regular, fontSize: 11, color: '#667781' },
-});
+}));

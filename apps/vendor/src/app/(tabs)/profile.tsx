@@ -3,8 +3,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { DOC_STATUS, formatPhone, KYC_LABEL, useBackend, useDb } from '@profecian/shared';
 import {
-  AppText, Avatar, Badge, Button, Card, ChipGroup, colors, confirmAction, Divider, FieldShell, KeyValue, SectionTitle, spacing, TextField, Toggle,
-} from '@profecian/ui';
+  AppText, Avatar, Badge, Button, Card, ChipGroup, colors, confirmAction, Divider, FieldShell, KeyValue, SectionTitle, spacing, TextField, Toggle, AppearanceSettings } from '@profecian/ui';
 import { useVendor } from '@/backend';
 import { VendorScreen } from '@/components/VendorScreen';
 
@@ -83,6 +82,8 @@ export default function Profile() {
           <AppText variant="small">To change documents or bank details, contact partner support.</AppText>
         </Card>
       </View>
+
+      <AppearanceSettings />
 
       <Card style={{ gap: 2 }}>
         <Button label="My reviews" variant="ghost" icon="star-outline" onPress={() => router.push('/reviews')} />

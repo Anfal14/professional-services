@@ -120,3 +120,16 @@ export function maskNumber(value: string, visible = 4): string {
 export function bySchedule(a: { date: string; slot: string }, b: { date: string; slot: string }): number {
   return scheduledAt(a.date, a.slot).getTime() - scheduledAt(b.date, b.slot).getTime();
 }
+
+/** Chip label for any date (e.g. one picked from the calendar), relative to today. */
+export function dayOption(iso: string, now = new Date()): DayOption {
+  const d = parseISODate(iso);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  return {
+    iso,
+    weekday: diff === 0 ? 'Today' : diff === 1 ? 'Tmrw' : DAY_NAMES[d.getDay()],
+    day: d.getDate(),
+    month: MONTH_NAMES[d.getMonth()],
+  };
+}

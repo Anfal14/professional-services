@@ -34,3 +34,13 @@ export function mapsUrl(address: { line: string; city: string; lat?: number; lng
   const q = address.lat != null && address.lng != null ? `${address.lat},${address.lng}` : `${address.line}, ${address.city}`;
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}`;
 }
+
+/** Closest served city to a coordinate — the web fallback for reverse geocoding. */
+export function nearestCity(lat: number, lng: number): { city: string; km: number } {
+  let best = { city: 'Solapur', km: Infinity };
+  for (const [city, c] of Object.entries(CITY_CENTRES)) {
+    const km = distanceKm({ lat, lng }, c);
+    if (km < best.km) best = { city, km };
+  }
+  return best;
+}

@@ -1,6 +1,6 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { Platform, StyleSheet, View } from 'react-native';
-import { formatDate, formatDateTime, formatINR, formatPhone, PAYMENT_METHOD_LABEL, useDb } from '@profecian/shared';
+import { Platform, View } from 'react-native';
+import { bookingProblemNames, formatDate, formatDateTime, formatINR, formatPhone, PAYMENT_METHOD_LABEL, useDb } from '@profecian/shared';
 import { Button as UiButton, Card, Divider } from '@profecian/ui';
 import { AppText } from '@/components/AppText';
 import { Container } from '@/components/Container';
@@ -9,7 +9,7 @@ import { Logo } from '@/components/Logo';
 import { Screen } from '@/components/Screen';
 import { useCustomer } from '@/backend';
 import { APP_CONFIG } from '@/config';
-import { colors, fonts, spacing } from '@/theme';
+import { colors, fonts, spacing, createStyles } from '@/theme';
 
 /** Tax invoice for a paid booking. Print / save as PDF from the browser on web. */
 export default function Invoice() {
@@ -26,7 +26,6 @@ export default function Invoice() {
     );
   }
   const category = db.categories.find((c) => c.id === b.categoryId);
-  const problem = db.problemTypes.find((p) => p.id === b.problemTypeId);
   const vendor = db.vendors.find((v) => v.id === b.vendorId);
   const halfTax = Math.round((b.price.tax / 2) * 100) / 100;
   const rate = Math.round((b.price.tax / Math.max(1, b.price.serviceAmount)) * 100);
@@ -65,7 +64,7 @@ export default function Invoice() {
           </View>
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
-              <AppText variant="label">{category?.name} — {problem?.name}</AppText>
+              <AppText variant="label">{category?.name} — {bookingProblemNames(db, b).join(', ')}</AppText>
               <AppText variant="small">Booking #{b.code} · {formatDate(b.date)}, {b.slot}{vendor ? ` · by ${vendor.name}` : ''}</AppText>
             </View>
             <AppText variant="bodyMedium">{formatINR(b.price.serviceAmount, { decimals: true })}</AppText>
@@ -100,11 +99,11 @@ function Line({ label, value, strong }: { label: string; value: string; strong?:
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   page: { paddingVertical: spacing.xxl, maxWidth: 760, gap: spacing.lg },
   invoice: { gap: spacing.lg, padding: spacing.xxl },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.lg },
   tableHead: { flexDirection: 'row', gap: spacing.lg },
   th: { fontFamily: fonts.bold, fontSize: 11, color: colors.muted, letterSpacing: 0.5 },
   amount: { fontFamily: fonts.semibold, fontSize: 14, color: colors.text },
-});
+}));

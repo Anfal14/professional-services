@@ -1,6 +1,6 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { formatPhone, useAction, useBackend, useDb } from '@profecian/shared';
 import { Banner, ChipGroup, FieldShell } from '@profecian/ui';
 import { AppText } from '@/components/AppText';
@@ -10,7 +10,7 @@ import { TextField } from '@/components/form/TextField';
 import { Screen } from '@/components/Screen';
 import { useCustomer } from '@/backend';
 import { useLocation } from '@/context/LocationContext';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, createStyles } from '@/theme';
 
 /** Step 2 of sign-up: create the customer profile for a newly verified number. */
 export default function ProfileSetup() {
@@ -55,6 +55,6 @@ export default function ProfileSetup() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   page: { paddingVertical: spacing.xxxl, maxWidth: 520, gap: spacing.xl },
-});
+}));

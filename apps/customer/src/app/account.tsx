@@ -1,6 +1,6 @@
 import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { formatPhone, useAction, useBackend, useDb } from '@profecian/shared';
 import { Banner, ChipGroup, FieldShell } from '@profecian/ui';
 import { AppText } from '@/components/AppText';
@@ -11,7 +11,7 @@ import { GoogleMark } from '@/components/GoogleMark';
 import { Screen } from '@/components/Screen';
 import { useCustomer } from '@/backend';
 import { useAuth } from '@/context/AuthContext';
-import { colors, fonts, radius, shadows, spacing } from '@/theme';
+import { colors, fonts, radius, shadows, spacing, createStyles } from '@/theme';
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -91,6 +91,7 @@ export default function AccountScreen() {
         <View style={styles.actions}>
           <Button label="My Bookings" icon="calendar-outline" variant="secondary" fullWidth onPress={() => router.push('/bookings')} />
           <Button label="Notifications" icon="notifications-outline" variant="secondary" fullWidth onPress={() => router.push('/notifications')} />
+          <Button label="Settings" icon="settings-outline" variant="secondary" fullWidth onPress={() => router.push('/settings')} />
           <Button label="Logout" icon="log-out-outline" variant="outline" fullWidth onPress={signOut} />
         </View>
       </Container>
@@ -98,7 +99,7 @@ export default function AccountScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   page: { paddingTop: spacing.xxxl, gap: spacing.xl, maxWidth: 520 },
   card: {
     alignItems: 'center',
@@ -133,4 +134,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   actions: { gap: spacing.md },
-});
+}));

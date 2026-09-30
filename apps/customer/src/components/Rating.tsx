@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, View } from 'react-native';
-import { colors, fonts } from '@/theme';
+import { View } from 'react-native';
+import { colors, fonts, createStyles } from '@/theme';
 import { AppText } from './AppText';
 
 export function Rating({ value, reviews, light }: { value: number; reviews?: string; light?: boolean }) {
@@ -13,8 +13,8 @@ export function Rating({ value, reviews, light }: { value: number; reviews?: str
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   value: { fontFamily: fonts.bold, fontSize: 13, color: colors.ink },
   reviews: { fontFamily: fonts.medium, fontSize: 12, color: colors.muted },
-});
+}));

@@ -1,5 +1,6 @@
 import { Children, type ReactNode } from 'react';
-import { StyleSheet, View, type DimensionValue } from 'react-native';
+import { View, type DimensionValue } from 'react-native';
+import { createStyles } from '@/theme';
 
 interface GridProps {
   children: ReactNode;
@@ -21,6 +22,6 @@ export function Grid({ children, columns, gap = 16 }: GridProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   row: { flexDirection: 'row', flexWrap: 'wrap' },
-});
+}));

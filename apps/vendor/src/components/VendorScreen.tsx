@@ -1,9 +1,9 @@
 import Head from 'expo-router/head';
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppText, colors, IconButton, spacing } from '@profecian/ui';
+import { AppText, colors, IconButton, spacing, createStyles } from '@profecian/ui';
 
 /** Mobile page shell: title bar (optional back + right action), scrollable body, optional sticky footer. */
 export function VendorScreen({ title, subtitle, back, right, children, footer, scroll = true }: {
@@ -38,9 +38,9 @@ export function VendorScreen({ title, subtitle, back, right, children, footer, s
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   root: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
   body: { padding: spacing.lg, gap: spacing.lg, width: '100%', maxWidth: 720, alignSelf: 'center' },
   footer: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, gap: spacing.sm },
-});
+}));

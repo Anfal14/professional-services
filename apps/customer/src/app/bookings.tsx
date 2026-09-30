@@ -2,8 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { Redirect, router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { bySchedule, isActive, PAYMENT_STATUS, useDb, type Booking } from '@profecian/shared';
+import { Pressable, ScrollView, View } from 'react-native';
+import { bookingProblemLabel, bySchedule, isActive, PAYMENT_STATUS, useDb, type Booking } from '@profecian/shared';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
@@ -17,7 +17,7 @@ import { useCustomer } from '@/backend';
 import { useBookings } from '@/context/BookingsContext';
 import { useCatalog } from '@/data/services';
 import { useResponsive } from '@/hooks/useResponsive';
-import { colors, fonts, radius, shadows, spacing } from '@/theme';
+import { colors, fonts, radius, shadows, spacing, createStyles } from '@/theme';
 import { formatAddress, formatDate, formatPrice } from '@/utils/format';
 
 type Filter = 'upcoming' | 'history' | 'cancelled';
@@ -113,7 +113,7 @@ function BookingCard({ booking }: { booking: Booking }) {
   const { getService } = useCatalog();
   const db = useDb();
   const service = getService(booking.categoryId);
-  const problem = db.problemTypes.find((p) => p.id === booking.problemTypeId);
+  const problemLabel = bookingProblemLabel(db, booking);
   const vendor = booking.vendorId ? db.vendors.find((v) => v.id === booking.vendorId) : undefined;
   const pay = PAYMENT_STATUS[booking.payment.status];
   const needsPayment = booking.status === 'completed' && booking.payment.status !== 'paid';
@@ -130,7 +130,7 @@ function BookingCard({ booking }: { booking: Booking }) {
             </AppText>
             <StatusBadge status={booking.status} />
           </View>
-          <AppText variant="small" numberOfLines={1}>{problem?.name}</AppText>
+          <AppText variant="small" numberOfLines={1}>{problemLabel}</AppText>
           <AppText style={styles.id}>#{booking.code}</AppText>
         </View>
       </View>
@@ -145,7 +145,7 @@ function BookingCard({ booking }: { booking: Booking }) {
       <View style={styles.footer}>
         <View>
           <AppText style={styles.price}>{formatPrice(booking.price.total)}</AppText>
-          <AppText variant="tiny" color={colors.muted}>{booking.status === 'cancelled' ? 'Not charged' : pay.label}</AppText>
+          <AppText variant="tiny" color={colors.muted}>{booking.status === 'cancelled' ? 'Not charged' : `Inc. GST · ${pay.label}`}</AppText>
         </View>
         <View style={styles.cta}>
           <AppText variant="label" color={needsPayment ? colors.danger : colors.primary}>
@@ -169,7 +169,7 @@ function Info({ icon, text }: { icon: 'calendar-outline' | 'time-outline' | 'loc
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   page: { paddingTop: spacing.xxxl },
   header: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.lg, marginBottom: spacing.xxl },
   filters: { gap: 8, paddingBottom: spacing.xl },
@@ -187,11 +187,11 @@ const styles = StyleSheet.create({
   },
   filterActive: { backgroundColor: colors.ink, borderColor: colors.ink },
   filterText: { fontFamily: fonts.semibold, fontSize: 14, color: colors.text },
-  filterTextActive: { color: colors.white },
+  filterTextActive: { color: colors.inverse },
   count: { minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 6, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
   countActive: { backgroundColor: 'rgba(255,255,255,0.18)' },
   countText: { fontFamily: fonts.bold, fontSize: 12, color: colors.muted },
-  countTextActive: { color: colors.white },
+  countTextActive: { color: colors.inverse },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
@@ -218,4 +218,4 @@ const styles = StyleSheet.create({
   },
   price: { fontFamily: fonts.extrabold, fontSize: 18, color: colors.ink },
   cta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-});
+}));
