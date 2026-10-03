@@ -7,7 +7,7 @@ import {
   useAction, useBackend, type BookingStatus,
 } from '@profecian/shared';
 import {
-  AppText, Badge, Banner, Button, ChipGroup, confirmAction, Divider, EmptyState, KeyValue, promptText, spacing, Timeline,
+  AppText, Badge, Banner, Button, ChipGroup, ComposeSheet, confirmAction, Divider, EmptyState, InspectionPanel, KeyValue, promptText, spacing, Timeline,
 } from '@profecian/ui';
 import { Cell, Page, Panel, Row } from '@/components/admin';
 import { useLookups } from '@/components/lookups';
@@ -22,6 +22,8 @@ export default function BookingDetail() {
   const b = db.bookings.find((x) => x.id === id);
   const [nextStatus, setNextStatus] = useState<BookingStatus | undefined>();
   const setStatus = useAction(backend.admin.setBookingStatus);
+  const quote = useAction(backend.admin.respondToQuote);
+  const [asking, setAsking] = useState(false);
 
   if (!b) {
     return (
@@ -32,11 +34,18 @@ export default function BookingDetail() {
   }
 
   const cat = category.get(b.categoryId);
-  const prob = problem.get(b.problemTypeId);
+  const prob = b.problemTypeId ? problem.get(b.problemTypeId) : undefined;
   const ven = b.vendorId ? vendor.get(b.vendorId) : undefined;
   const cus = customer.get(b.customerId);
   const closed = b.status === 'completed' || b.status === 'cancelled';
   const review = b.reviewId ? db.reviews.find((r) => r.id === b.reviewId) : undefined;
+
+  /** Support records the customer's answer to a quote (e.g. confirmed on a call). */
+  const recordQuote = async (approve: boolean) => {
+    const note = await promptText(approve ? 'Approve quote for customer' : 'Decline quote for customer', 'How did the customer confirm? This is shown on the booking timeline.', 'Confirmed by phone');
+    if (note == null) return;
+    await quote.run(b.id, approve, note);
+  };
 
   const cancel = async () => {
     const reason = await promptText('Cancel booking', `Reason for cancelling ${b.code}? The customer and vendor are notified.`, 'Cancelled by support');
@@ -57,12 +66,32 @@ export default function BookingDetail() {
       }
     >
       {setStatus.error ? <Banner tone="danger" icon="alert-circle" title={setStatus.error} /> : null}
+      {quote.error ? <Banner tone="danger" icon="alert-circle" title={quote.error} /> : null}
+      {b.inspection ? (
+        <InspectionPanel
+          booking={b}
+          categoryName={cat?.name}
+          audience="admin"
+          actions={closed ? null : (
+            <>
+              <Button label={b.inspection.awaitingCustomer ? 'Ask another question' : 'Ask customer'} icon="chatbubble-ellipses-outline" size="sm" variant="secondary" onPress={() => setAsking(true)} />
+              {b.inspection.status === 'quoted' ? (
+                <>
+                  <Button label="Record approval" icon="checkmark-circle-outline" size="sm" variant="success" loading={quote.pending} onPress={() => recordQuote(true)} />
+                  <Button label="Record decline" icon="close-circle-outline" size="sm" variant="outline" loading={quote.pending} onPress={() => recordQuote(false)} />
+                </>
+              ) : null}
+              <Button label="Call customer" icon="call-outline" size="sm" variant="outline" onPress={() => Linking.openURL(`tel:+91${b.customerPhone}`)} />
+            </>
+          )}
+        />
+      ) : null}
       <Row min={380}>
         <View style={{ gap: spacing.lg }}>
           <Panel title="Service">
             <KeyValue label="Category" value={cat?.name ?? '—'} />
-            <KeyValue label={(b.items?.length ?? 1) > 1 ? 'Problems' : 'Problem type'} value={bookingProblemNames(db, b).join(', ') || '—'} />
-            <KeyValue label="Pricing model" value={prob ? PRICING_MODEL_LABEL[prob.pricingModel] : '—'} />
+            <KeyValue label={bookingProblemNames(db, b).length > 1 ? 'Problems' : 'Problem type'} value={bookingProblemNames(db, b).join(', ') || '—'} />
+            <KeyValue label="Pricing model" value={b.inspection ? 'Inspection fee, then approved quote' : prob ? PRICING_MODEL_LABEL[prob.pricingModel] : '—'} />
             <KeyValue label="Scheduled" value={`${formatDate(b.date)}, ${b.slot}`} />
             {b.notes ? <KeyValue label="Customer notes" value={b.notes} /> : null}
           </Panel>
@@ -149,6 +178,17 @@ export default function BookingDetail() {
           ) : null}
         </View>
       </Row>
+      <ComposeSheet
+        visible={asking}
+        onClose={() => setAsking(false)}
+        title="Ask the customer"
+        label="Question"
+        placeholder="e.g. Is the wall inside or outside the house?"
+        hint="Sent by WhatsApp and shown on their booking. Use this when details are missing before assigning or quoting."
+        submitLabel="Send question"
+        minLength={5}
+        onSubmit={(text) => backend.admin.askCustomer(b.id, text)}
+      />
     </Page>
   );
 }

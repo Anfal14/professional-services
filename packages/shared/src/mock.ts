@@ -12,13 +12,14 @@
 import { distanceKm, jitterNear } from './geo';
 import { isValidPhone, normalizePhone, scheduledAt, toISODate } from './format';
 import { notifyFor } from './notify';
+import { canQuote, INSPECTION_MAX_PHOTOS, INSPECTION_MIN_DETAILS, inspectionFeeFor, inspectionServiceAmount, isQuoteOpen } from './inspection';
 import { breakdownFor, computeBreakdown, computeVendorWallet } from './pricing';
 import { sandboxOtp, sandboxPayments, type OtpProvider, type PaymentGateway, type PaymentRequest } from './providers';
 import { createSeedDatabase, DB_VERSION, DEMO } from './seed';
 import { canCustomerModify, VENDOR_NEXT } from './status';
 import type {
-  Address, AdminUser, AppNotification, BankAccount, Booking, BookingEvent, BookingStatus, Complaint, Customer, Database,
-  ID, KycDocType, KycDocument, PaymentMethod, Payout, ProblemType, Review, Role, ServiceCategory, Vendor, WorkingHours,
+  Address, AdminUser, AppNotification, BankAccount, Booking, BookingEvent, BookingStatus, ClarificationMessage, Complaint, Customer, Database,
+  ID, InspectionRequest, KycDocType, KycDocument, PaymentMethod, Payout, ProblemType, QuoteLine, Review, Role, ServiceCategory, Vendor, WorkingHours,
 } from './types';
 
 export interface KeyValueStorage {
@@ -38,6 +39,26 @@ export interface Snapshot {
 }
 
 export class ApiError extends Error {}
+
+export type BackendKind = 'mock' | 'http';
+
+/** One visit per service in a cart checkout. */
+export interface CheckoutGroup {
+  categoryId: ID;
+  problemTypeIds: ID[];
+  notes?: string;
+  inspection?: { description: string; photos?: string[] };
+}
+
+export interface CheckoutInput {
+  customerId: ID;
+  groups: CheckoutGroup[];
+  date: string;
+  slot: string;
+  address: Omit<Address, 'id'> & { id?: ID };
+  contactName: string;
+  contactPhone: string;
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let seq = 0;
@@ -186,6 +207,55 @@ export function createMockBackend(options: BackendOptions) {
     }));
   }
 
+  /* ───────── "Other / Not sure" (inspection) — shared by all roles ───────── */
+
+  /** Price follows the inspection: known problems + fee, or + the approved quote instead of the fee. */
+  const repriced = (b: Booking): Booking => {
+    const d = db();
+    const cat = d.categories.find((c) => c.id === b.categoryId);
+    return { ...b, price: computeBreakdown(inspectionServiceAmount(b), cat?.commissionRate ?? d.settings.defaultCommissionRate, d.settings.taxRate) };
+  };
+
+  const openInspection = (b: Booking): InspectionRequest => {
+    if (!b.inspection) throw new ApiError('This booking has no “Not sure” request');
+    if (b.status === 'cancelled' || b.status === 'completed') throw new ApiError('This booking is closed');
+    return b.inspection;
+  };
+
+  const message = (from: Role, authorName: string, text: string): ClarificationMessage => ({
+    id: uid('msg'), from, authorName, text, at: new Date().toISOString(),
+  });
+
+  function askCustomer(bookingId: ID, from: 'vendor' | 'admin', authorName: string, question: string) {
+    const i = openInspection(getBooking(bookingId));
+    const text = question.trim();
+    if (text.length < 5) throw new ApiError('Write a short question for the customer');
+    return updateBooking(
+      bookingId,
+      (x) => ({
+        ...x,
+        inspection: { ...i, messages: [...i.messages, message(from, authorName, text)], awaitingCustomer: true },
+        timeline: [...x.timeline, event('clarification_requested', from, text)],
+      }),
+      (x) => notifyFor.clarificationRequested(db(), x, authorName, text),
+    );
+  }
+
+  function settleQuote(bookingId: ID, approve: boolean, by: 'customer' | 'admin', note?: string) {
+    const i = openInspection(getBooking(bookingId));
+    if (i.status !== 'quoted' || !i.quote) throw new ApiError('There is no quote waiting for an answer');
+    const quote = { ...i.quote, respondedAt: new Date().toISOString(), respondedBy: by };
+    return updateBooking(
+      bookingId,
+      (x) => repriced({
+        ...x,
+        inspection: { ...i, status: approve ? 'approved' : 'declined', quote },
+        timeline: [...x.timeline, event(approve ? 'quote_approved' : 'quote_declined', by, note?.trim() || undefined)],
+      }),
+      (x) => notifyFor.quoteResponse(db(), x, approve),
+    );
+  }
+
   /* ───────── Customer ───────── */
 
   const customer = {
@@ -238,28 +308,91 @@ export function createMockBackend(options: BackendOptions) {
     async createBooking(input: {
       customerId: ID; categoryId: ID; problemTypeIds: ID[]; date: string; slot: string;
       address: Omit<Address, 'id'> & { id?: ID }; contactName: string; contactPhone: string; notes?: string;
+      /** "Other / Not sure": what the customer sees, in their own words, plus optional photos. */
+      inspection?: { description: string; photos?: string[] };
     }): Promise<Booking> {
       await wait();
       const d = db();
       const category = d.categories.find((c) => c.id === input.categoryId && c.enabled);
       const ids = [...new Set(input.problemTypeIds)];
       const problems = ids.map((id) => d.problemTypes.find((p) => p.id === id && p.categoryId === input.categoryId && p.enabled));
-      if (!category || !problems.length || problems.some((p) => !p)) throw new ApiError('This service is currently unavailable');
+      if (!category || problems.some((p) => !p)) throw new ApiError('This service is currently unavailable');
+      if (!problems.length && !input.inspection) throw new ApiError('Choose a problem, or “Other / Not sure”');
+      const description = input.inspection?.description.trim() ?? '';
+      if (input.inspection && description.length < INSPECTION_MIN_DETAILS) {
+        throw new ApiError(`Describe the problem in a few words (at least ${INSPECTION_MIN_DETAILS} characters)`);
+      }
       const items = (problems as ProblemType[]).map((p) => ({ problemTypeId: p.id, name: p.name, price: p.price }));
-      const serviceAmount = items.reduce((sum, i) => sum + i.price, 0);
+      const inspection: InspectionRequest | undefined = input.inspection
+        ? {
+            description,
+            photos: (input.inspection.photos ?? []).slice(0, INSPECTION_MAX_PHOTOS),
+            fee: inspectionFeeFor(category, d.settings),
+            status: 'pending',
+            messages: [],
+            awaitingCustomer: false,
+          }
+        : undefined;
       if (!isValidPhone(input.contactPhone)) throw new ApiError('Enter a valid contact number');
       if (scheduledAt(input.date, input.slot).getTime() < Date.now()) throw new ApiError('Please choose a future time slot');
       const address = await customer.saveAddress(input.customerId, input.address);
       const b: Booking = {
         id: uid('bkg'), code: bookingCode(), customerId: input.customerId,
         customerName: input.contactName.trim(), customerPhone: normalizePhone(input.contactPhone),
-        categoryId: category.id, problemTypeId: items[0].problemTypeId, items, date: input.date, slot: input.slot, address,
+        categoryId: category.id, problemTypeId: items[0]?.problemTypeId, items, inspection, date: input.date, slot: input.slot, address,
         notes: input.notes?.trim() || undefined, status: 'pending_assignment',
-        price: computeBreakdown(serviceAmount, category.commissionRate ?? d.settings.defaultCommissionRate, d.settings.taxRate), payment: { status: 'unpaid' }, proofPhotos: [],
+        price: computeBreakdown(inspectionServiceAmount({ items, inspection }), category.commissionRate ?? d.settings.defaultCommissionRate, d.settings.taxRate), payment: { status: 'unpaid' }, proofPhotos: [],
         timeline: [event('pending_assignment', 'customer', 'Booking placed')], createdAt: new Date().toISOString(),
       };
       commit((x) => ({ ...x, bookings: [b, ...x.bookings] }), notifyFor.bookingCreated(d, b));
       return b;
+    },
+
+    /** Cart checkout: one booking per service with a shared slot, address and contact — all or nothing. */
+    async checkout(input: CheckoutInput): Promise<Booking[]> {
+      if (!input.groups.length) throw new ApiError('Your cart is empty');
+      const snapshotBefore = snapshot;
+      const created: Booking[] = [];
+      try {
+        let address = input.address;
+        for (const g of input.groups) {
+          const b = await customer.createBooking({ ...g, customerId: input.customerId, date: input.date, slot: input.slot, address, contactName: input.contactName, contactPhone: input.contactPhone });
+          created.push(b);
+          address = b.address;
+        }
+        return created;
+      } catch (e) {
+        // Roll back the visits already placed so the cart is never half-booked.
+        snapshot = snapshotBefore;
+        emit();
+        void persist();
+        throw e;
+      }
+    },
+
+    async answerClarification(customerId: ID, bookingId: ID, answer: string) {
+      await wait();
+      const b = getBooking(bookingId);
+      if (b.customerId !== customerId) throw new ApiError('Booking not found');
+      const i = openInspection(b);
+      const text = answer.trim();
+      if (text.length < 2) throw new ApiError('Type your answer');
+      const c = db().customers.find((x) => x.id === customerId);
+      return updateBooking(
+        bookingId,
+        (x) => ({
+          ...x,
+          inspection: { ...i, messages: [...i.messages, message('customer', c?.name ?? x.customerName, text)], awaitingCustomer: false },
+          timeline: [...x.timeline, event('clarification_answered', 'customer', text)],
+        }),
+        (x) => notifyFor.clarificationAnswered(db(), x, text),
+      );
+    },
+
+    async respondToQuote(customerId: ID, bookingId: ID, approve: boolean) {
+      await wait();
+      if (getBooking(bookingId).customerId !== customerId) throw new ApiError('Booking not found');
+      return settleQuote(bookingId, approve, 'customer');
     },
 
     async cancelBooking(id: ID, reason: string) {
@@ -292,6 +425,7 @@ export function createMockBackend(options: BackendOptions) {
     async payOnline(id: ID, method: PaymentRequest['method'], opts: { simulateFailure?: boolean } = {}) {
       const b = getBooking(id);
       if (b.payment.status === 'paid') throw new ApiError('This booking is already paid');
+      if (isQuoteOpen(b)) throw new ApiError('You can pay once the inspection is done and the repair quote is settled');
       updateBooking(id, (x) => ({ ...x, payment: { method, status: 'pending' } }));
       const res = await payments.charge({ amount: b.price.total, method, bookingCode: b.code, simulateFailure: opts.simulateFailure });
       if (!res.ok) {
@@ -413,6 +547,13 @@ export function createMockBackend(options: BackendOptions) {
       if (b.vendorId !== vendorId) throw new ApiError('This job is not assigned to you');
       const next = VENDOR_NEXT[b.status];
       if (!next) throw new ApiError('No further action for this job');
+      if (next === 'completed' && isQuoteOpen(b)) {
+        throw new ApiError(
+          b.inspection?.status === 'quoted'
+            ? 'Wait for the customer to approve or decline your quote before completing'
+            : 'Share a quote, or mark that no repair is needed, before completing',
+        );
+      }
       const v = getVendor(vendorId);
       const updated = updateBooking(
         bookingId,
@@ -421,6 +562,54 @@ export function createMockBackend(options: BackendOptions) {
       );
       if (next === 'completed') commit((d) => ({ ...d, vendors: replace(d.vendors, vendorId, (x) => ({ ...x, jobsCompleted: x.jobsCompleted + 1 })) }));
       return updated;
+    },
+
+    async askClarification(vendorId: ID, bookingId: ID, question: string) {
+      await wait();
+      const b = getBooking(bookingId);
+      if (b.vendorId !== vendorId) throw new ApiError('This job is not assigned to you');
+      return askCustomer(bookingId, 'vendor', getVendor(vendorId).name, question);
+    },
+
+    /** After inspecting: an itemised quote the customer must approve before the repair starts. */
+    async shareQuote(vendorId: ID, bookingId: ID, lines: QuoteLine[], note?: string) {
+      await wait();
+      const b = getBooking(bookingId);
+      if (b.vendorId !== vendorId) throw new ApiError('This job is not assigned to you');
+      const i = openInspection(b);
+      if (!canQuote(b)) throw new ApiError('Share a quote after you arrive and inspect');
+      const clean = lines
+        .map((l) => ({ description: l.description.trim(), amount: Math.round(Number(l.amount)) }))
+        .filter((l) => l.description || l.amount);
+      if (!clean.length) throw new ApiError('Add at least one item to the quote');
+      if (clean.length > 10) throw new ApiError('Keep the quote to 10 items or fewer');
+      if (clean.some((l) => l.description.length < 3)) throw new ApiError('Describe each item of the quote');
+      if (clean.some((l) => !Number.isFinite(l.amount) || l.amount <= 0 || l.amount > 500_000)) throw new ApiError('Enter a valid amount for each item');
+      const amount = clean.reduce((sum, l) => sum + l.amount, 0);
+      return updateBooking(
+        bookingId,
+        (x) => ({
+          ...x,
+          inspection: { ...i, status: 'quoted', quote: { lines: clean, amount, note: note?.trim() || undefined, vendorId, createdAt: new Date().toISOString() } },
+          timeline: [...x.timeline, event('quote_shared', 'vendor', `${clean.length} item${clean.length > 1 ? 's' : ''}, ₹${amount} + GST`)],
+        }),
+        (x) => notifyFor.quoteShared(db(), x),
+      );
+    },
+
+    async markNoWorkNeeded(vendorId: ID, bookingId: ID, note: string) {
+      await wait();
+      const b = getBooking(bookingId);
+      if (b.vendorId !== vendorId) throw new ApiError('This job is not assigned to you');
+      const i = openInspection(b);
+      if (!canQuote(b)) throw new ApiError('Inspect on site first');
+      const text = note.trim();
+      if (text.length < 5) throw new ApiError('Tell the customer what you found');
+      return updateBooking(bookingId, (x) => repriced({
+        ...x,
+        inspection: { ...i, status: 'no_work_needed', noWorkNote: text, quote: undefined },
+        timeline: [...x.timeline, event('no_work_needed', 'vendor', text)],
+      }));
     },
 
     /** Decline an assigned job — it goes back to the admin queue. */
@@ -436,6 +625,7 @@ export function createMockBackend(options: BackendOptions) {
     },
 
     async addProofPhoto(vendorId: ID, bookingId: ID, uri: string) {
+      await wait();
       const b = getBooking(bookingId);
       if (b.vendorId !== vendorId) throw new ApiError('This job is not assigned to you');
       return updateBooking(bookingId, (x) => ({ ...x, proofPhotos: [...x.proofPhotos, uri] }));
@@ -534,6 +724,17 @@ export function createMockBackend(options: BackendOptions) {
       commit((d) => ({ ...d, problemTypes: d.problemTypes.filter((p) => p.id !== id) }));
     },
 
+    async askCustomer(bookingId: ID, question: string) {
+      await wait();
+      return askCustomer(bookingId, 'admin', 'Profecian support', question);
+    },
+
+    /** Record the customer's answer to a quote, e.g. after confirming by phone. */
+    async respondToQuote(bookingId: ID, approve: boolean, note: string) {
+      await wait();
+      return settleQuote(bookingId, approve, 'admin', note || 'Confirmed with the customer by support');
+    },
+
     async assignVendor(bookingId: ID, vendorId: ID) {
       await wait();
       const b = getBooking(bookingId);
@@ -545,6 +746,8 @@ export function createMockBackend(options: BackendOptions) {
         bookingId,
         (x) => ({
           ...x,
+          // A quote belongs to the professional who made it: a newly assigned professional inspects again.
+          inspection: reassign && x.inspection?.status === 'quoted' ? { ...x.inspection, status: 'pending', quote: undefined } : x.inspection,
           vendorId,
           status: 'assigned',
           timeline: [...x.timeline, event(reassign ? 'reassigned' : 'assigned', 'admin', `${reassign ? 'Reassigned' : 'Assigned'} to ${v.name}`)],
@@ -557,9 +760,14 @@ export function createMockBackend(options: BackendOptions) {
       await wait();
       const b = getBooking(bookingId);
       if (status !== 'pending_assignment' && status !== 'cancelled' && !b.vendorId) throw new ApiError('Assign a vendor first');
+      if (status === 'completed' && isQuoteOpen(b)) throw new ApiError('This “Not sure” booking has no settled quote — record the customer’s answer, or have the professional mark no repair needed, first');
       return updateBooking(
         bookingId,
-        (x) => ({ ...x, status, vendorId: status === 'pending_assignment' ? undefined : x.vendorId, cancelReason: status === 'cancelled' ? note ?? 'Cancelled by support' : x.cancelReason, timeline: [...x.timeline, event(status, 'admin', note)] }),
+        (x) => ({
+          ...x,
+          // Unassigning drops a quote made by the previous professional.
+          inspection: status === 'pending_assignment' && x.inspection?.status === 'quoted' ? { ...x.inspection, status: 'pending', quote: undefined } : x.inspection,
+          status, vendorId: status === 'pending_assignment' ? undefined : x.vendorId, cancelReason: status === 'cancelled' ? note ?? 'Cancelled by support' : x.cancelReason, timeline: [...x.timeline, event(status, 'admin', note)] }),
         (x) => (status === 'cancelled' ? notifyFor.cancelled(db(), x, 'admin') : status === 'completed' ? notifyFor.serviceCompleted(db(), x) : []),
       );
     },
@@ -612,6 +820,8 @@ export function createMockBackend(options: BackendOptions) {
   };
 
   return {
+    /** "mock" keeps everything on this device; "http" talks to the real backend (shared data). */
+    kind: 'mock' as BackendKind,
     /** Load persisted state (or seed) — call once at app start. */
     async init() {
       if (ready) return;

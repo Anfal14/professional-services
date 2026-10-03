@@ -69,7 +69,7 @@ export default function Onboarding() {
       {submitted ? (
         <View style={{ gap: spacing.sm, paddingTop: spacing.md }}>
           <AppText variant="tiny" align="center">DEMO ONLY — in production an admin approves you from the admin panel.</AppText>
-          <Button label="Simulate admin approval" variant="outline" icon="flask-outline" onPress={() => backend.admin.reviewVendor(vendor.id, 'approved')} style={{ alignSelf: 'center' }} />
+          {backend.kind === 'mock' ? <Button label="Simulate admin approval" variant="outline" icon="flask-outline" onPress={() => backend.admin.reviewVendor(vendor.id, 'approved')} style={{ alignSelf: 'center' }} /> : null}
         </View>
       ) : null}
 

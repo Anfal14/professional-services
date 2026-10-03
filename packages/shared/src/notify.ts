@@ -46,7 +46,9 @@ export function bookingAckText(db: Database, b: Booking): string {
     `🛠️ ${service} – ${problem}`,
     `📅 ${formatDate(b.date)} at ${b.slot}`,
     `📍 ${b.address.line}${b.address.landmark ? ` (Near ${b.address.landmark})` : ''}, ${b.address.city}`,
-    `💰 ${formatINR(b.price.total)} (incl. GST)`,
+    b.inspection
+      ? `💰 ${formatINR(b.price.total)} inspection visit (incl. GST) — the professional quotes before any repair`
+      : `💰 ${formatINR(b.price.total)} (incl. GST)`,
     ``,
     `We'll share your professional's details as soon as one is assigned.`,
   ].join('\n');
@@ -156,6 +158,62 @@ export const notifyFor = {
       title: 'Vendor pending approval', body: `${v.name} (${v.city}) submitted KYC documents for review.`, channels: ['in_app'],
     })];
   },
+  /** A professional or support asked the customer something about a "Not sure" request. */
+  clarificationRequested(db: Database, b: Booking, askedBy: string, question: string): AppNotification[] {
+    return [makeNotification({
+      audience: 'customer', recipientId: b.customerId, kind: 'clarification_requested', bookingId: b.id,
+      title: 'Question about your booking', body: `${askedBy} asks: “${question}” — reply in the app (${b.code}).`,
+      channels: ['whatsapp', 'push'], whatsappTo: b.customerPhone,
+    })];
+  },
+
+  clarificationAnswered(db: Database, b: Booking, answer: string): AppNotification[] {
+    const out: AppNotification[] = [makeNotification({
+      audience: 'admin', recipientId: 'admin', kind: 'clarification_answered', bookingId: b.id,
+      title: 'Customer replied', body: `${b.code}: “${answer}”`, channels: ['in_app'],
+    })];
+    if (b.vendorId) {
+      out.push(makeNotification({
+        audience: 'vendor', recipientId: b.vendorId, kind: 'clarification_answered', bookingId: b.id,
+        title: 'Customer replied', body: `${b.code}: “${answer}”`, channels: ['push'],
+      }));
+    }
+    return out;
+  },
+
+  quoteShared(db: Database, b: Booking): AppNotification[] {
+    const { service } = names(db, b);
+    const amount = b.inspection?.quote?.amount ?? 0;
+    return [
+      makeNotification({
+        audience: 'customer', recipientId: b.customerId, kind: 'quote_shared', bookingId: b.id,
+        title: 'Repair quote ready', body: `${service} (${b.code}): ${formatINR(amount)} + GST. Approve or decline in the app before any work starts.`,
+        channels: ['whatsapp', 'push'], whatsappTo: b.customerPhone,
+      }),
+      makeNotification({
+        audience: 'admin', recipientId: 'admin', kind: 'quote_shared', bookingId: b.id,
+        title: 'Quote shared', body: `${b.code}: ${formatINR(amount)} + GST, awaiting customer.`, channels: ['in_app'],
+      }),
+    ];
+  },
+
+  quoteResponse(db: Database, b: Booking, approved: boolean): AppNotification[] {
+    const verdict = approved ? 'approved' : 'declined';
+    const out: AppNotification[] = [makeNotification({
+      audience: 'admin', recipientId: 'admin', kind: 'quote_response', bookingId: b.id,
+      title: `Quote ${verdict}`, body: `${b.code}: customer ${verdict} the repair quote.`, channels: ['in_app'],
+    })];
+    if (b.vendorId) {
+      out.push(makeNotification({
+        audience: 'vendor', recipientId: b.vendorId, kind: 'quote_response', bookingId: b.id,
+        title: `Quote ${verdict}`,
+        body: approved ? `${b.code}: go ahead with the repair.` : `${b.code}: complete the visit for the inspection fee, or share a revised quote.`,
+        channels: ['push'],
+      }));
+    }
+    return out;
+  },
+
   complaint(b: Booking, subject: string): AppNotification[] {
     return [makeNotification({
       audience: 'admin', recipientId: 'admin', kind: 'new_complaint', bookingId: b.id,

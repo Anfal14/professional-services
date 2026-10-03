@@ -3,12 +3,14 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Linking, View } from 'react-native';
 import {
-  BOOKING_STATUS, bookingProblemLabel, formatDate, formatINR, formatPhone, mapsUrl, PAYMENT_METHOD_LABEL, PAYMENT_STATUS, TRACKING_STEPS, useAction, useBackend, useDb,
-  VENDOR_ACTION_LABEL, VENDOR_NEXT,
+  BOOKING_STATUS, bookingProblemLabel, canQuote, formatDate, formatINR, formatPhone, mapsUrl, PAYMENT_METHOD_LABEL, PAYMENT_STATUS, TRACKING_STEPS, useAction, useBackend, useDb,
+  isQuoteOpen, VENDOR_ACTION_LABEL, VENDOR_NEXT,
 } from '@profecian/shared';
 import {
-  AppText, asIcon, Badge, Banner, Button, Card, colors, confirmAction, Divider, EmptyState, KeyValue, PhotoPicker, promptText, radius, spacing, Timeline, tintTile } from '@profecian/ui';
+  AppText, asIcon, Badge, Banner, Button, Card, colors, ComposeSheet, confirmAction, Divider, EmptyState, InspectionPanel, KeyValue, PhotoPicker, promptText, radius, spacing, Timeline, tintTile } from '@profecian/ui';
+import { useState } from 'react';
 import { useVendor } from '@/backend';
+import { QuoteSheet } from '@/components/QuoteSheet';
 import { VendorScreen } from '@/components/VendorScreen';
 
 const ACTION_ICON = { assigned: 'checkmark-circle-outline', accepted: 'navigate-outline', on_the_way: 'location-outline', arrived: 'construct-outline', in_progress: 'checkmark-done-outline' } as const;
@@ -22,6 +24,7 @@ export default function JobDetail() {
   const decline = useAction(backend.vendor.declineJob);
   const cash = useAction(backend.vendor.collectCash);
   const job = db.bookings.find((b) => b.id === id && b.vendorId === vendor?.id);
+  const [sheet, setSheet] = useState<'ask' | 'quote' | 'no-work' | null>(null);
 
   if (!vendor || !job) {
     return (
@@ -38,6 +41,8 @@ export default function JobDetail() {
   const stepIndex = TRACKING_STEPS.indexOf(job.status);
   const canShowContact = job.status !== 'assigned';
   const error = advance.error ?? decline.error ?? cash.error;
+  // A "Not sure" job can't be completed while its price is still open (no quote, or quote unanswered).
+  const blockedByQuote = next === 'completed' && isQuoteOpen(job);
 
   const onAdvance = async () => {
     if (next === 'completed' && !(await confirmAction('Complete service', 'Confirm the work is finished and checked with the customer?', 'Complete'))) return;
@@ -53,7 +58,11 @@ export default function JobDetail() {
   const footer = job.status === 'cancelled' ? null : next && label ? (
     <View style={{ flexDirection: 'row', gap: spacing.sm }}>
       {job.status === 'assigned' ? <Button label="Decline" variant="outline" size="lg" onPress={onDecline} loading={decline.pending} /> : null}
-      <Button label={label} size="lg" icon={ACTION_ICON[job.status as keyof typeof ACTION_ICON]} fullWidth style={{ flex: 1 }} loading={advance.pending} onPress={onAdvance} variant={next === 'completed' ? 'success' : 'primary'} />
+      {blockedByQuote && canQuote(job) ? (
+        <Button label="Share quote" size="lg" icon="document-text-outline" fullWidth style={{ flex: 1 }} onPress={() => setSheet('quote')} />
+      ) : (
+        <Button label={label} size="lg" icon={ACTION_ICON[job.status as keyof typeof ACTION_ICON]} fullWidth style={{ flex: 1 }} loading={advance.pending} onPress={onAdvance} variant={next === 'completed' ? 'success' : 'primary'} disabled={blockedByQuote} />
+      )}
     </View>
   ) : job.status === 'completed' && job.payment.status !== 'paid' ? (
     <Button label={`Collect ${formatINR(job.price.total)} in cash`} size="lg" icon="cash-outline" variant="success" fullWidth loading={cash.pending}
@@ -85,6 +94,21 @@ export default function JobDetail() {
         {job.notes ? <Banner tone="info" icon="chatbox-ellipses-outline" title="Customer note" message={job.notes} /> : null}
       </Card>
 
+      {job.inspection ? (
+        <InspectionPanel
+          booking={job}
+          categoryName={category?.name}
+          audience="vendor"
+          actions={job.status === 'cancelled' || job.status === 'completed' ? null : (
+            <>
+              {canQuote(job) ? <Button label={job.inspection.status === 'declined' ? 'Share revised quote' : 'Share quote'} icon="document-text-outline" size="sm" onPress={() => setSheet('quote')} /> : null}
+              {canQuote(job) ? <Button label="No repair needed" icon="checkmark-done-outline" size="sm" variant="outline" onPress={() => setSheet('no-work')} /> : null}
+              <Button label={job.inspection.awaitingCustomer ? 'Question sent' : 'Ask customer'} icon="chatbubble-ellipses-outline" size="sm" variant="secondary" disabled={job.inspection.awaitingCustomer} onPress={() => setSheet('ask')} />
+            </>
+          )}
+        />
+      ) : null}
+
       <Card style={{ gap: spacing.md }}>
         <AppText variant="h3">Customer</AppText>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -108,10 +132,11 @@ export default function JobDetail() {
 
       <Card style={{ gap: 4 }}>
         <AppText variant="h3" style={{ marginBottom: 6 }}>Payment</AppText>
-        <KeyValue label="Service amount" value={formatINR(job.price.serviceAmount)} />
+        <KeyValue label={job.inspection && job.inspection.status !== 'approved' ? 'Service amount (incl. inspection fee)' : 'Service amount'} value={formatINR(job.price.serviceAmount)} />
         <KeyValue label={`Platform commission (${Math.round(job.price.commissionRate * 100)}%)`} value={`−${formatINR(job.price.commission)}`} />
         <KeyValue label="You earn" value={formatINR(job.price.vendorPayout)} strong tone="success" />
         <AppText variant="small">Customer pays {formatINR(job.price.total)} incl. {formatINR(job.price.tax)} GST.</AppText>
+        {isQuoteOpen(job) ? <AppText variant="small">Updates when the customer approves your repair quote.</AppText> : null}
         <Divider style={{ marginVertical: 6 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Badge label={PAYMENT_STATUS[job.payment.status].label} tone={PAYMENT_STATUS[job.payment.status].tone} />
@@ -145,6 +170,34 @@ export default function JobDetail() {
         <AppText variant="h3">Timeline</AppText>
         <Timeline events={job.timeline} />
       </Card>
+
+      {job.inspection ? (
+        <>
+          <QuoteSheet visible={sheet === 'quote'} onClose={() => setSheet(null)} job={job} vendorId={vendor.id} />
+          <ComposeSheet
+            visible={sheet === 'ask'}
+            onClose={() => setSheet(null)}
+            title="Ask the customer"
+            label="Your question"
+            placeholder="e.g. Is the unit split or window type?"
+            hint="Sent by WhatsApp and in the app. You’ll be notified when they reply."
+            submitLabel="Send question"
+            minLength={5}
+            onSubmit={(text) => backend.vendor.askClarification(vendor.id, job.id, text)}
+          />
+          <ComposeSheet
+            visible={sheet === 'no-work'}
+            onClose={() => setSheet(null)}
+            title="No repair needed"
+            label="What did you find?"
+            placeholder="e.g. Filter was clogged — cleaned it, AC cools normally now"
+            hint="The customer pays only the inspection fee. You can then complete the job."
+            submitLabel="Confirm — no repair needed"
+            minLength={5}
+            onSubmit={(text) => backend.vendor.markNoWorkNeeded(vendor.id, job.id, text)}
+          />
+        </>
+      ) : null}
     </VendorScreen>
   );
 }

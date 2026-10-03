@@ -1,0 +1,32 @@
+# Local infrastructure for the Profecian backend.
+#   docker compose up -d     # start Postgres 16 + PostGIS and Redis
+#   docker compose down -v   # stop and wipe data
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: profecian
+      POSTGRES_USER: profecian
+      POSTGRES_PASSWORD: profecian
+    ports:
+      - "5433:5432" # 5433 on the host so it never clashes with a locally installed Postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U profecian -d profecian"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:

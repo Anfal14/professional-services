@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { PRICING_MODEL_LABEL, useAction, useBackend, type PricingModel, type ProblemType, type ServiceCategory } from '@profecian/shared';
+import { PRICING_MODEL_LABEL, useAction, useBackend, useDb, type PricingModel, type ProblemType, type ServiceCategory } from '@profecian/shared';
 import {
   AppText, asIcon, Banner, Button, ChipGroup, colors, FieldShell, PhotoPicker, radius, Sheet, spacing, TextField, Toggle,
 } from '@profecian/ui';
@@ -41,9 +41,12 @@ const emptyCategory: CategoryDraft = {
 
 export function CategorySheet({ visible, onClose, initial }: { visible: boolean; onClose: () => void; initial?: ServiceCategory }) {
   const backend = useBackend();
+  const db = useDb();
   const [draft, setDraft] = useState<CategoryDraft>(initial ?? emptyCategory);
   const [includes, setIncludes] = useState((initial?.includes ?? []).join(', '));
   const [commission, setCommission] = useState(String(Math.round((initial?.commissionRate ?? 0.2) * 100)));
+  // Empty = use the platform default inspection fee.
+  const [inspectionFee, setInspectionFee] = useState(initial?.inspectionFee != null ? String(initial.inspectionFee) : '');
   const save = useAction(backend.admin.saveCategory);
   const set = <K extends keyof CategoryDraft>(k: K, v: CategoryDraft[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
@@ -53,7 +56,12 @@ export function CategorySheet({ visible, onClose, initial }: { visible: boolean;
       save.setError('Commission must be between 0 and 60%');
       return;
     }
-    const ok = await save.run({ ...draft, commissionRate: rate / 100, includes: includes.split(',').map((s) => s.trim()).filter(Boolean) });
+    const fee = inspectionFee.trim() === '' ? undefined : Number(inspectionFee);
+    if (fee !== undefined && !(Number.isInteger(fee) && fee >= 0 && fee <= 10_000)) {
+      save.setError('Inspection fee must be a whole amount between ₹0 and ₹10,000');
+      return;
+    }
+    const ok = await save.run({ ...draft, commissionRate: rate / 100, inspectionFee: fee, includes: includes.split(',').map((s) => s.trim()).filter(Boolean) });
     if (ok) onClose();
   };
 
@@ -75,6 +83,7 @@ export function CategorySheet({ visible, onClose, initial }: { visible: boolean;
       <TextField label="Image URL" placeholder="https://…" autoCapitalize="none" value={draft.image.startsWith('http') ? draft.image : ''} onChangeText={(t) => set('image', t)} hint="Or upload an image below (stored locally until a backend exists)." />
       <PhotoPicker label="Upload image" value={draft.image && !draft.image.startsWith('http') ? [draft.image] : []} onChange={(u) => set('image', u[0] ?? '')} max={1} />
       <TextField label="Platform commission (%)" keyboardType="numeric" value={commission} onChangeText={setCommission} hint="Deducted from the service amount before the vendor payout." />
+      <TextField label="“Other / Not sure” inspection fee (₹)" optional keyboardType="number-pad" value={inspectionFee} onChangeText={(t) => setInspectionFee(t.replace(/\D/g, ''))} placeholder={`Platform default (₹${db.settings.defaultInspectionFee})`} hint="Charged before GST when the customer isn’t sure of the problem; replaced by the repair quote if they approve one." />
       <TextField label="What's included" placeholder="Comma separated, e.g. 30-day warranty, Genuine parts" value={includes} onChangeText={setIncludes} />
       <View style={{ flexDirection: 'row', gap: spacing.xl, flexWrap: 'wrap' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>

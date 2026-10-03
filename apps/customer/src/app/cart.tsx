@@ -3,7 +3,8 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, View, type ScrollView } from 'react-native';
-import { computeBreakdown, isSlotAvailable, isValidPhone, useBackend, useDb } from '@profecian/shared';
+import { computeBreakdown, INSPECTION_MAX_PHOTOS, INSPECTION_MIN_DETAILS, isSlotAvailable, isValidPhone, useBackend, useDb } from '@profecian/shared';
+import { PhotoPicker } from '@profecian/ui';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
@@ -17,7 +18,7 @@ import { Screen } from '@/components/Screen';
 import { useCustomer } from '@/backend';
 import { useCart } from '@/context/CartContext';
 import { formatFullAddress, useLocation } from '@/context/LocationContext';
-import { groupCart, OTHER_ISSUE_ID, useCatalog } from '@/data/services';
+import { groupCart, useCatalog } from '@/data/services';
 import { useResponsive } from '@/hooks/useResponsive';
 import { colors, createStyles, fonts, radius, shadows, spacing } from '@/theme';
 import type { WebPressableState } from '@/types';
@@ -48,6 +49,11 @@ export default function CartScreen() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // "Other / Not sure" details per service: required description + optional photos.
+  const [details, setDetails] = useState<Record<string, { description: string; photos: string[] }>>({});
+  const detailFor = (serviceId: string) => details[serviceId] ?? { description: '', photos: [] };
+  const setDetail = (serviceId: string, patch: Partial<{ description: string; photos: string[] }>) =>
+    setDetails((all) => ({ ...all, [serviceId]: { ...detailFor(serviceId), ...patch } }));
 
   const groups = groupCart(services, cart.items);
   const bills = groups.map((g) => {
@@ -78,9 +84,14 @@ export default function CartScreen() {
   if (!time) errors.time = 'Pick a time slot';
   else if (date && !isSlotAvailable(date, time)) errors.time = 'That slot has passed — pick another';
   if (customer && !selectedAddress) errors.address = 'Add or choose the address for the visit';
+  const detailErrors = Object.fromEntries(
+    groups
+      .filter((g) => g.notSure && detailFor(g.service.id).description.trim().length < INSPECTION_MIN_DETAILS)
+      .map((g) => [g.service.id, `Describe the ${g.service.name.toLowerCase()} problem in a few words (at least ${INSPECTION_MIN_DETAILS} characters)`]),
+  ) as Record<string, string>;
   if (customer && name.trim().length < 2) errors.name = 'Enter the contact person’s name';
   if (customer && !isValidPhone(phone)) errors.phone = 'Enter a valid 10-digit mobile number';
-  const missing = Object.keys(errors).length;
+  const missing = Object.keys(errors).length + Object.keys(detailErrors).length;
   const shown = (f: Field) => (touched ? errors[f] : undefined);
 
   const pickDate = (d: string) => {
@@ -100,27 +111,25 @@ export default function CartScreen() {
       return;
     }
     setSubmitting(true);
-    const booked: string[] = [];
     try {
-      for (const g of groups) {
-        const b = await backend.customer.createBooking({
-          customerId: customer.id,
+      // One request for the whole cart: every visit is booked, or none is.
+      const booked = await backend.customer.checkout({
+        customerId: customer.id,
+        groups: groups.map((g) => ({
           categoryId: g.service.id,
           problemTypeIds: g.problemTypeIds,
-          date,
-          slot: time,
-          address: selectedAddress,
-          contactName: name,
-          contactPhone: phone,
-          notes: g.lines.some((l) => l.issueId === OTHER_ISSUE_ID) ? 'Customer is not sure of the problem — inspection requested' : undefined,
-        });
-        booked.push(b.id);
-        cart.clear(g.service.id);
-      }
-      router.replace({ pathname: '/success', params: { id: booked[0], more: booked.slice(1).join(',') || undefined } });
+          inspection: g.notSure ? { description: detailFor(g.service.id).description, photos: detailFor(g.service.id).photos } : undefined,
+        })),
+        date,
+        slot: time,
+        address: selectedAddress,
+        contactName: name,
+        contactPhone: phone,
+      });
+      cart.clear();
+      router.replace({ pathname: '/success', params: { id: booked[0].id, more: booked.slice(1).map((b) => b.id).join(',') || undefined } });
     } catch (e) {
-      const reason = e instanceof Error ? e.message : 'Something went wrong while booking. Please try again.';
-      setSubmitError(booked.length ? `${booked.length} booking placed, but the rest failed: ${reason}` : reason);
+      setSubmitError(e instanceof Error ? e.message : 'Something went wrong while booking. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -204,6 +213,31 @@ export default function CartScreen() {
                     </Pressable>
                   </View>
                 ))}
+                {g.notSure ? (
+                  <View style={styles.notSure}>
+                    <AppText variant="label">Tell us about the {g.service.name.toLowerCase()} problem</AppText>
+                    <AppText variant="small">
+                      The professional reads this before the visit, inspects, and shares a quote for you to approve before any repair. If you decline, you pay only the {formatPrice(g.service.inspectionFee)} inspection fee.
+                    </AppText>
+                    <TextField
+                      label="What’s happening?"
+                      required
+                      multiline
+                      placeholder="e.g. AC runs but doesn’t cool, makes a rattling sound when it starts"
+                      value={detailFor(g.service.id).description}
+                      onChangeText={(t) => setDetail(g.service.id, { description: t })}
+                      error={touched ? detailErrors[g.service.id] : undefined}
+                      maxLength={500}
+                    />
+                    <PhotoPicker
+                      label="Photos"
+                      max={INSPECTION_MAX_PHOTOS}
+                      camera
+                      value={detailFor(g.service.id).photos}
+                      onChange={(photos) => setDetail(g.service.id, { photos })}
+                    />
+                  </View>
+                ) : null}
               </View>
             ))}
 
@@ -302,6 +336,7 @@ const styles = createStyles(() => ({
     gap: spacing.sm,
     ...shadows.sm,
   },
+  notSure: { gap: spacing.sm, marginTop: spacing.xs, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.selectedBg, borderWidth: 1, borderColor: colors.primaryBorder },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   thumb: { width: 48, height: 48, borderRadius: radius.md },
   item: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },

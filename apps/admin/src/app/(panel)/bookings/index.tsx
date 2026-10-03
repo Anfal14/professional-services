@@ -1,25 +1,27 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { ACTIVE_STATUSES, BOOKING_STATUS, formatDate, formatINR, formatPhone, PAYMENT_STATUS, type Booking } from '@profecian/shared';
+import { ACTIVE_STATUSES, BOOKING_STATUS, formatDate, formatINR, formatPhone, INSPECTION_STATUS, PAYMENT_STATUS, type Booking } from '@profecian/shared';
 import { Badge, spacing } from '@profecian/ui';
 import { Cell, DataTable, Page, SearchInput, Tabs } from '@/components/admin';
 import { useLookups } from '@/components/lookups';
 
-type Filter = 'all' | 'pending' | 'active' | 'completed' | 'cancelled';
+type Filter = 'all' | 'pending' | 'active' | 'not_sure' | 'completed' | 'cancelled';
 
 const match: Record<Filter, (b: Booking) => boolean> = {
   all: () => true,
   pending: (b) => b.status === 'pending_assignment',
   active: (b) => ACTIVE_STATUSES.includes(b.status) && b.status !== 'pending_assignment',
+  // Open "Other / Not sure" requests, whatever their category.
+  not_sure: (b) => !!b.inspection && b.status !== 'completed' && b.status !== 'cancelled',
   completed: (b) => b.status === 'completed',
   cancelled: (b) => b.status === 'cancelled',
 };
 
 export default function Bookings() {
   const { db, serviceLabel, vendorName } = useLookups();
-  const params = useLocalSearchParams<{ customer?: string; vendor?: string }>();
-  const [filter, setFilter] = useState<Filter>('all');
+  const params = useLocalSearchParams<{ customer?: string; vendor?: string; filter?: string }>();
+  const [filter, setFilter] = useState<Filter>(() => (params.filter && params.filter in match ? (params.filter as Filter) : 'all'));
   const [q, setQ] = useState('');
 
   const scoped = useMemo(
@@ -47,6 +49,7 @@ export default function Bookings() {
             { value: 'all', label: 'All', count: counts.all },
             { value: 'pending', label: 'Awaiting assignment', count: counts.pending },
             { value: 'active', label: 'Active', count: counts.active },
+            { value: 'not_sure', label: 'Not sure', count: counts.not_sure },
             { value: 'completed', label: 'Completed', count: counts.completed },
             { value: 'cancelled', label: 'Cancelled', count: counts.cancelled },
           ]}
@@ -63,7 +66,12 @@ export default function Bookings() {
           { key: 'svc', title: 'Service', flex: 1.8, min: 210, render: (b) => <Cell title={serviceLabel(b)} sub={b.address.city} /> },
           { key: 'when', title: 'Scheduled', min: 130, render: (b) => <Cell title={formatDate(b.date)} sub={b.slot} />, sort: (b) => `${b.date}` },
           { key: 'vendor', title: 'Vendor', flex: 1.2, min: 150, render: (b) => <Cell title={vendorName(b.vendorId)} /> },
-          { key: 'status', title: 'Status', min: 170, render: (b) => <Badge label={BOOKING_STATUS[b.status].label} tone={BOOKING_STATUS[b.status].tone} />, sort: (b) => b.status },
+          { key: 'status', title: 'Status', min: 170, render: (b) => (
+            <View style={{ gap: 3, alignItems: 'flex-start' }}>
+              <Badge label={BOOKING_STATUS[b.status].label} tone={BOOKING_STATUS[b.status].tone} />
+              {b.inspection ? <Badge label={b.inspection.awaitingCustomer ? 'Not sure · waiting for customer' : `Not sure · ${INSPECTION_STATUS[b.inspection.status].label}`} tone={b.inspection.awaitingCustomer ? 'warning' : INSPECTION_STATUS[b.inspection.status].tone} /> : null}
+            </View>
+          ), sort: (b) => b.status },
           {
             key: 'amt', title: 'Amount', min: 130, align: 'right', sort: (b) => b.price.total,
             render: (b) => (

@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react';
 import { useMemo } from 'react';
 import type Ionicons from '@expo/vector-icons/Ionicons';
-import { useDb, type Database, type PricingModel } from '@profecian/shared';
+import { inspectionFeeFor, useDb, type Database, type PricingModel } from '@profecian/shared';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -26,6 +26,8 @@ export interface Service {
   rating: number;
   reviews: string;
   startingPrice: number;
+  /** Visit charge (before GST) for "Other / Not sure". */
+  inspectionFee: number;
   eta: string;
   popular?: boolean;
   includes: string[];
@@ -69,6 +71,7 @@ export function buildServices(db: Database): Service[] {
         rating,
         reviews: formatCount(reviews.length),
         startingPrice: problems.length ? Math.min(...problems.map((p) => p.price)) : 0,
+        inspectionFee: inspectionFeeFor(c, db.settings),
         eta: '45 mins',
         popular: c.popular,
         includes: c.includes,
@@ -86,16 +89,6 @@ export function buildServices(db: Database): Service[] {
     .filter((s) => s.issues.length > 0);
 }
 
-export function getIssueTitle(service: Service, issueId: string): string {
-  if (issueId === OTHER_ISSUE_ID) return 'Other / Not sure';
-  return service.issues.find((i) => i.id === issueId)?.title ?? issueId;
-}
-
-/** The problem type actually booked: "Not sure" becomes the inspection visit (or the cheapest option). */
-export function resolveIssue(service: Service, issueId: string): Issue | undefined {
-  if (issueId !== OTHER_ISSUE_ID) return service.issues.find((i) => i.id === issueId);
-  return service.issues.find((i) => i.pricingModel === 'inspection') ?? [...service.issues].sort((a, b) => a.price - b.price)[0];
-}
 
 export function useCatalog() {
   const db = useDb();
@@ -143,15 +136,18 @@ export const testimonials = [
   },
 ];
 
-/** The "Other / Not sure" option shown as a selectable issue, priced as the visit it books. */
+/**
+ * "Other / Not sure" shown as a selectable option. It is not a problem type:
+ * the booking keeps the category and carries an inspection request instead,
+ * priced at the category's inspection fee until the customer approves a quote.
+ */
 export function otherIssue(service: Service): Issue {
-  const booked = resolveIssue(service, OTHER_ISSUE_ID);
   return {
     id: OTHER_ISSUE_ID,
     title: 'Other / Not sure',
-    description: 'Our expert will inspect and quote on the spot',
-    price: booked?.price ?? service.startingPrice,
-    duration: booked?.duration ?? '30 mins',
+    description: 'Describe it at checkout — the expert inspects and quotes before any work',
+    price: service.inspectionFee,
+    duration: 'Quote on site',
     icon: 'help-circle-outline',
     pricingModel: 'inspection',
   };
@@ -160,17 +156,18 @@ export function otherIssue(service: Service): Issue {
 export interface CartLine {
   issueId: string;
   issue: Issue;
-  /** Problem type actually booked ("Not sure" resolves to the inspection visit). */
-  problemTypeId: string;
 }
 
 export interface CartGroup {
   service: Service;
   lines: CartLine[];
-  /** Distinct problem types to book in one visit. */
+  /** Known problems booked in this visit. */
   problemTypeIds: string[];
+  /** The customer also picked "Other / Not sure" for this service. */
+  notSure: boolean;
+  /** Pre-tax amount: known problems + inspection fee when not sure. */
   subtotal: number;
-  /** Some prices are "starting at" / inspection — final quote after the visit. */
+  /** Some prices are "starting at" / inspection — final amount confirmed on site. */
   estimate: boolean;
 }
 
@@ -180,18 +177,21 @@ export function groupCart(services: Service[], items: { serviceId: string; issue
   for (const item of items) {
     const service = services.find((s) => s.id === item.serviceId);
     if (!service) continue;
-    const issue = item.issueId === OTHER_ISSUE_ID ? otherIssue(service) : service.issues.find((i) => i.id === item.issueId);
-    const booked = resolveIssue(service, item.issueId);
-    if (!issue || !booked) continue;
+    const notSure = item.issueId === OTHER_ISSUE_ID;
+    const issue = notSure ? otherIssue(service) : service.issues.find((i) => i.id === item.issueId);
+    if (!issue) continue;
     let group = groups.find((g) => g.service.id === service.id);
     if (!group) {
-      group = { service, lines: [], problemTypeIds: [], subtotal: 0, estimate: false };
+      group = { service, lines: [], problemTypeIds: [], notSure: false, subtotal: 0, estimate: false };
       groups.push(group);
     }
-    group.lines.push({ issueId: item.issueId, issue, problemTypeId: booked.id });
-    if (!group.problemTypeIds.includes(booked.id)) {
-      group.problemTypeIds.push(booked.id);
-      group.subtotal += booked.price;
+    group.lines.push({ issueId: item.issueId, issue });
+    if (notSure) {
+      if (!group.notSure) group.subtotal += service.inspectionFee;
+      group.notSure = true;
+    } else if (!group.problemTypeIds.includes(issue.id)) {
+      group.problemTypeIds.push(issue.id);
+      group.subtotal += issue.price;
     }
     if (issue.pricingModel !== 'fixed') group.estimate = true;
   }

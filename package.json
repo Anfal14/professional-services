@@ -11,6 +11,14 @@
     "vendor": "npm run web --workspace @profecian/vendor",
     "admin": "npm run web --workspace @profecian/admin",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "backend:seed": "tsx backend/scripts/generate-dev-seed.ts",
+    "backend:up": "docker compose -f backend/docker-compose.yml up -d",
+    "backend:down": "docker compose -f backend/docker-compose.yml down",
+    "backend": "node backend/scripts/mvnw.mjs spring-boot:run",
+    "backend:test": "node backend/scripts/mvnw.mjs verify"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
   }
 }

@@ -8,11 +8,12 @@
 | `DECISIONS.md` | Decisions to preserve |
 | `INSTRUCTIONS.md` | Operating rules (imported by `CLAUDE.md`) |
 
-No `DATABASE.md`/`API.md`: the data model is `packages/shared/src/types.ts`, the API surface is `packages/shared/src/mock.ts`.
+Data model: `packages/shared/src/types.ts` (TS) and `backend/src/main/resources/db/migration/V1__schema.sql` (SQL). API: `packages/shared/src/mock.ts` / `http.ts` (client) and Swagger at /swagger-ui.html (server).
 
 ## Features
 | Feature | Context file | Status |
 | --- | --- | --- |
+| Spring Boot backend + HTTP client | `features/backend.md` | Built — tests green; app e2e pending |
 | Shared domain + mock backend + UI kit + themes | `features/platform-shared.md` | Done (mock) |
 | Customer journey (OTP/profile, cart, addresses, booking, tracking, pay, review, invoice, notifications) | `features/platform-customer.md` | Done (mock) |
 | Vendor app (OTP, KYC onboarding, jobs workflow, earnings, profile) | `features/platform-vendor.md` | Done (mock) |

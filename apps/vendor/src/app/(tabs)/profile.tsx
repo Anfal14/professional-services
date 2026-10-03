@@ -88,7 +88,7 @@ export default function Profile() {
       <Card style={{ gap: 2 }}>
         <Button label="My reviews" variant="ghost" icon="star-outline" onPress={() => router.push('/reviews')} />
         <Button label="Notifications" variant="ghost" icon="notifications-outline" onPress={() => router.push('/notifications')} />
-        <Button label="Reset demo data" variant="ghost" icon="refresh" onPress={async () => { if (await confirmAction('Reset demo data', 'Restore the seeded jobs and wallet?', 'Reset')) await backend.resetDemoData(); }} />
+        {backend.kind === 'mock' ? <Button label="Reset demo data" variant="ghost" icon="refresh" onPress={async () => { if (await confirmAction('Reset demo data', 'Restore the seeded jobs and wallet?', 'Reset')) await backend.resetDemoData(); }} /> : null}
       </Card>
       <AppText variant="tiny" align="center" color={colors.subtle}>Profecian Partner · demo build (mock backend)</AppText>
     </VendorScreen>

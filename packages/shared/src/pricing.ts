@@ -1,3 +1,4 @@
+import { INSPECTION_LABEL } from './inspection';
 import type { Booking, Database, PriceBreakdown, ProblemType, ServiceCategory, PlatformSettings } from './types';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -32,17 +33,21 @@ export function breakdownFor(
   return computeBreakdown(problem.price, rate, settings.taxRate);
 }
 
-/** Names of every problem in a booking (older bookings have just `problemTypeId`). */
-export function bookingProblemNames(db: Pick<Database, 'problemTypes'>, b: Pick<Booking, 'problemTypeId' | 'items'>): string[] {
-  if (b.items?.length) return b.items.map((i) => i.name);
-  const p = db.problemTypes.find((x) => x.id === b.problemTypeId);
-  return p ? [p.name] : [];
+/** Names of every problem in a booking, plus the "Not sure" request if there is one. */
+export function bookingProblemNames(db: Pick<Database, 'problemTypes'>, b: Pick<Booking, 'problemTypeId' | 'items' | 'inspection'>): string[] {
+  const names = b.items?.length ? b.items.map((i) => i.name) : [];
+  if (!names.length && b.problemTypeId) {
+    const p = db.problemTypes.find((x) => x.id === b.problemTypeId);
+    if (p) names.push(p.name);
+  }
+  if (b.inspection) names.push(INSPECTION_LABEL);
+  return names;
 }
 
 /** "Fan repair", "Fan repair + Switch repair" or "Fan repair + 2 more". */
-export function bookingProblemLabel(db: Pick<Database, 'problemTypes'>, b: Pick<Booking, 'problemTypeId' | 'items'>): string {
+export function bookingProblemLabel(db: Pick<Database, 'problemTypes'>, b: Pick<Booking, 'problemTypeId' | 'items' | 'inspection'>): string {
   const n = bookingProblemNames(db, b);
-  if (n.length <= 2) return n.join(" + ");
+  if (n.length <= 2) return n.join(' + ');
   return `${n[0]} + ${n.length - 1} more`;
 }
 

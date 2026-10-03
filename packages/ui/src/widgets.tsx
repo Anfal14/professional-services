@@ -100,6 +100,12 @@ const EVENT_LABEL: Record<string, string> = {
   payment_received: 'Payment received',
   payment_failed: 'Payment failed',
   reviewed: 'Review submitted',
+  clarification_requested: 'Question for the customer',
+  clarification_answered: 'Customer replied',
+  quote_shared: 'Repair quote shared',
+  quote_approved: 'Quote approved',
+  quote_declined: 'Quote declined',
+  no_work_needed: 'Inspected — no repair needed',
 };
 
 export function Timeline({ events }: { events: BookingEvent[] }) {
