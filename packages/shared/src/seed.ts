@@ -4,13 +4,14 @@
  */
 import { CITY_CENTRES, jitterNear } from './geo';
 import { toISODate, TIME_SLOTS } from './format';
+import { inspectionServiceAmount } from './inspection';
 import { computeBreakdown } from './pricing';
 import type {
-  AdminUser, AppNotification, Booking, BookingEvent, BookingStatus, Complaint, Customer, Database,
+  AdminUser, AppNotification, Booking, BookingEvent, BookingStatus, Complaint, Customer, Database, InspectionRequest,
   KycDocument, PaymentMethod, Payout, ProblemType, Review, ServiceCategory, Vendor,
 } from './types';
 
-export const DB_VERSION = 4;
+export const DB_VERSION = 7;
 
 /* ───────────── Demo identities (shown as hints on login screens) ───────────── */
 
@@ -219,6 +220,7 @@ export function createSeedDatabase(now = new Date()): Database {
   const settings: Database['settings'] = {
     taxRate: 0.18,
     defaultCommissionRate: 0.2,
+    defaultInspectionFee: 199,
     cities: Object.keys(CITY_CENTRES),
     whatsappNumber: '919876543210',
     supportPhone: '+91 98765 43210',
@@ -246,7 +248,7 @@ export function createSeedDatabase(now = new Date()): Database {
     return {
       id,
       name,
-      phone: i === 0 ? DEMO.vendorPhone : i === 9 ? DEMO.pendingVendorPhone : `98765${String(100 + i).padStart(5, '0')}`,
+      phone: i === 0 ? DEMO.vendorPhone : i === 9 ? DEMO.pendingVendorPhone : `98765${String(110 + i).padStart(5, '0')}`, // 110+ so no vendor collides with the demo numbers
       city,
       serviceAreas: city === 'Solapur' ? ['Sadar Bazar', 'Hotgi Road', 'Vijapur Naka'].slice(0, 2 + (i % 2)) : [city],
       categoryIds: cats,
@@ -280,16 +282,19 @@ export function createSeedDatabase(now = new Date()): Database {
     'Average experience, had to call twice for directions.',
   ];
 
-  const makeBooking = (i: number, opts: { dayOffset: number; status: BookingStatus; customer?: Customer; vendor?: Vendor; categoryId?: string }) => {
+  const makeBooking = (i: number, opts: {
+    dayOffset: number; status: BookingStatus; customer?: Customer; vendor?: Vendor; categoryId?: string;
+    problemTypeId?: string; slot?: string; notes?: string;
+  }) => {
     const customer = opts.customer ?? pick(customers.slice(0, 12));
     const vendorPool = approved.filter((v) => v.city === customer.city);
     const vendor = opts.vendor ?? (opts.status === 'pending_assignment' ? undefined : pick(vendorPool.length ? vendorPool : approved));
     const categoryId = opts.categoryId ?? (vendor ? pick(vendor.categoryIds) : pick(categories).id);
     const category = catById.get(categoryId)!;
-    const problem = pick(problemTypes.filter((p) => p.categoryId === categoryId));
+    const problem = (opts.problemTypeId && problemTypes.find((p) => p.id === opts.problemTypeId)) || pick(problemTypes.filter((p) => p.categoryId === categoryId));
     const date = new Date(now);
     date.setDate(date.getDate() + opts.dayOffset);
-    const slot = opts.dayOffset === 0 ? pick(TIME_SLOTS.slice(6)) : pick(TIME_SLOTS);
+    const slot = opts.slot ?? (opts.dayOffset === 0 ? pick(TIME_SLOTS.slice(6)) : pick(TIME_SLOTS));
     // History is booked the day before; upcoming bookings were placed over the last few days.
     const created = daysAgo(opts.dayOffset < 0 ? -opts.dayOffset + 1 : 1 + (i % 5), 9);
     const price = computeBreakdown(problem.price, category.commissionRate, settings.taxRate);
@@ -317,6 +322,7 @@ export function createSeedDatabase(now = new Date()): Database {
       customerPhone: customer.phone,
       categoryId,
       problemTypeId: problem.id,
+      notes: opts.notes,
       date: toISODate(date),
       slot,
       address: customer.addresses[0],
@@ -371,6 +377,53 @@ export function createSeedDatabase(now = new Date()): Database {
   // Admin queue: unassigned requests across cities.
   for (let k = 0; k < 6; k++) makeBooking(n++, { dayOffset: k % 3, status: 'pending_assignment' });
   for (let k = 0; k < 4; k++) makeBooking(n++, { dayOffset: k % 2, status: pick(['assigned', 'accepted', 'in_progress'] as const) });
+  // "Other / Not sure" examples — one per stage, in different categories. The category stays the
+  // customer's choice; there is no problem type, only an inspection request priced at the visit fee.
+  const notSure = (b: Booking, inspection: Omit<InspectionRequest, 'fee' | 'photos' | 'messages' | 'awaitingCustomer'> & Partial<InspectionRequest>, extra: BookingEvent[] = []) => {
+    const category = catById.get(b.categoryId)!;
+    b.problemTypeId = undefined;
+    b.items = [];
+    b.inspection = { photos: [], messages: [], awaitingCustomer: false, fee: category.inspectionFee ?? settings.defaultInspectionFee, ...inspection };
+    b.price = computeBreakdown(inspectionServiceAmount(b), category.commissionRate, settings.taxRate);
+    b.timeline.push(...extra);
+  };
+  const at = (hoursAgo: number) => new Date(now.getTime() - hoursAgo * 3_600_000).toISOString();
+  const rahul = customers.find((c) => c.city === demoVendor.city && c !== demoCustomer && c !== customers[2]) ?? customers[6];
+  // 1. Vendor: a new job to accept — AC Repair, nothing inspected yet.
+  notSure(makeBooking(n++, { dayOffset: 1, status: 'assigned', vendor: demoVendor, categoryId: 'ac-repair', slot: '11:00 AM', customer: rahul }), {
+    status: 'pending',
+    description: 'AC is not cooling properly and makes a rattling sound when it starts. Not sure what the problem is.',
+  });
+  // 2. Customer + vendor: inspected on site, quote waiting for the customer — Electrician.
+  notSure(makeBooking(n++, { dayOffset: 0, status: 'in_progress', vendor: demoVendor, customer: demoCustomer, categoryId: 'electrician', slot: '09:00 AM' }), {
+    status: 'quoted',
+    description: 'Bedroom fan stopped working and the switchboard next to it sparks sometimes.',
+    messages: [
+      { id: 'msg_seed_1', from: 'vendor', authorName: demoVendor.name, text: 'Does the fan hum when switched on, or is it completely silent?', at: at(20) },
+      { id: 'msg_seed_2', from: 'customer', authorName: demoCustomer.name, text: 'It hums but does not spin.', at: at(19) },
+    ],
+    quote: {
+      lines: [
+        { description: 'Replace fan capacitor (2.5 µF)', amount: 350 },
+        { description: 'Replace burnt switch and rewire board point', amount: 250 },
+      ],
+      amount: 600,
+      note: 'Parts included. Takes about 40 minutes.',
+      vendorId: demoVendor.id,
+      createdAt: at(0.5),
+    },
+  }, [
+    { kind: 'clarification_requested', at: at(20), by: 'vendor', note: 'Does the fan hum when switched on, or is it completely silent?' },
+    { kind: 'clarification_answered', at: at(19), by: 'customer', note: 'It hums but does not spin.' },
+    { kind: 'quote_shared', at: at(0.5), by: 'vendor', note: '2 items, ₹600 + GST' },
+  ]);
+  // 3. Admin + customer: support needs details before assigning — Painting.
+  notSure(makeBooking(n++, { dayOffset: 4, status: 'pending_assignment', customer: demoCustomer, categoryId: 'painting', slot: '10:00 AM' }), {
+    status: 'pending',
+    description: 'Damp patches and peeling paint on one wall, want it fixed and repainted.',
+    awaitingCustomer: true,
+    messages: [{ id: 'msg_seed_3', from: 'admin', authorName: 'Profecian support', text: 'Is the wall inside or outside, and roughly how big is the damp area?', at: at(3) }],
+  }, [{ kind: 'clarification_requested', at: at(3), by: 'admin', note: 'Is the wall inside or outside, and roughly how big is the damp area?' }]);
 
   // Vendor aggregates from reviews + completed jobs.
   for (const v of vendors) {

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-/** One selected problem. `issueId` is a problem type id or OTHER_ISSUE_ID ("Not sure"). */
+/** One selected problem. `issueId` is a problem type id, or OTHER_ISSUE_ID for "Other / Not sure" (booked as an inspection request). */
 export interface CartItem {
   serviceId: string;
   issueId: string;

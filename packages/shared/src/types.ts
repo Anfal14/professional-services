@@ -29,6 +29,8 @@ export interface ServiceCategory {
   popular: boolean;
   /** 0–1, platform commission taken from the service amount */
   commissionRate: number;
+  /** Visit charge (before GST) for "Other / Not sure" requests; falls back to settings.defaultInspectionFee. */
+  inspectionFee?: number;
   includes: string[];
   sortOrder: number;
 }
@@ -174,7 +176,13 @@ export type BookingEventKind =
   | 'reassigned'
   | 'payment_received'
   | 'payment_failed'
-  | 'reviewed';
+  | 'reviewed'
+  | 'clarification_requested'
+  | 'clarification_answered'
+  | 'quote_shared'
+  | 'quote_approved'
+  | 'quote_declined'
+  | 'no_work_needed';
 
 export interface BookingEvent {
   kind: BookingEventKind;
@@ -190,6 +198,58 @@ export interface BookingItem {
   price: number;
 }
 
+/* ───────────── "Other / Not sure" requests ───────────── */
+
+/**
+ * pending        → professional has not inspected yet
+ * quoted         → professional shared a quote; waiting for the customer (or admin on their behalf)
+ * approved       → quote accepted; it replaces the inspection fee
+ * declined       → quote rejected; only the inspection fee is billed (a new quote may be shared)
+ * no_work_needed → inspected, nothing to fix; only the inspection fee is billed
+ */
+export type InspectionStatus = 'pending' | 'quoted' | 'approved' | 'declined' | 'no_work_needed';
+
+export interface QuoteLine {
+  description: string;
+  amount: number;
+}
+
+export interface InspectionQuote {
+  lines: QuoteLine[];
+  /** Sum of lines, before GST. */
+  amount: number;
+  note?: string;
+  vendorId: ID;
+  createdAt: Timestamp;
+  respondedAt?: Timestamp;
+  /** "admin" when support confirmed the customer’s answer by phone. */
+  respondedBy?: 'customer' | 'admin';
+}
+
+export interface ClarificationMessage {
+  id: ID;
+  from: Role;
+  authorName: string;
+  text: string;
+  at: Timestamp;
+}
+
+/** The customer could not pick a problem: the professional inspects, then quotes, within the chosen category. */
+export interface InspectionRequest {
+  /** What the customer described at checkout (required). */
+  description: string;
+  photos: string[];
+  /** Visit charge before GST, billed unless a quote is approved. */
+  fee: number;
+  status: InspectionStatus;
+  quote?: InspectionQuote;
+  /** Questions and answers between customer, professional and support. */
+  messages: ClarificationMessage[];
+  /** A question to the customer is waiting for their reply. */
+  awaitingCustomer: boolean;
+  noWorkNote?: string;
+}
+
 export interface Booking {
   id: ID;
   /** Human-readable, e.g. "PF7K2Q" */
@@ -198,9 +258,11 @@ export interface Booking {
   customerName: string;
   customerPhone: string;
   categoryId: ID;
-  /** The first (primary) problem; `items` lists every problem in the visit. */
-  problemTypeId: ID;
+  /** The first (primary) problem, if any; `items` lists every known problem in the visit. */
+  problemTypeId?: ID;
   items?: BookingItem[];
+  /** Present when the customer chose "Other / Not sure" in this category. */
+  inspection?: InspectionRequest;
   /** yyyy-mm-dd */
   date: string;
   /** "10:00 AM" */
@@ -281,7 +343,11 @@ export type NotificationKind =
   | 'new_booking'
   | 'vendor_pending_approval'
   | 'payment_failed'
-  | 'new_complaint';
+  | 'new_complaint'
+  | 'clarification_requested'
+  | 'clarification_answered'
+  | 'quote_shared'
+  | 'quote_response';
 
 export interface AppNotification {
   id: ID;
@@ -321,6 +387,8 @@ export interface PlatformSettings {
   taxRate: number;
   /** Used when a category has no explicit rate */
   defaultCommissionRate: number;
+  /** Inspection visit charge for "Other / Not sure" when a category has none. */
+  defaultInspectionFee: number;
   cities: string[];
   whatsappNumber: string;
   supportPhone: string;

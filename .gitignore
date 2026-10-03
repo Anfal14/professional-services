@@ -19,3 +19,7 @@ npm-debug.*
 apps/*/ios
 apps/*/android
 /QuickJob/
+
+# Backend
+backend/target/
+backend/data/

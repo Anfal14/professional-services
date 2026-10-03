@@ -9,6 +9,7 @@ export default function Settings() {
   const backend = useBackend();
   const [tax, setTax] = useState(String(Math.round(db.settings.taxRate * 100)));
   const [commission, setCommission] = useState(String(Math.round(db.settings.defaultCommissionRate * 100)));
+  const [inspectionFee, setInspectionFee] = useState(String(db.settings.defaultInspectionFee));
   const [saved, setSaved] = useState(false);
   const save = useAction(backend.admin.updateSettings);
   const reminders = useAction(backend.admin.sendTodayReminders);
@@ -18,11 +19,16 @@ export default function Settings() {
   const submit = async () => {
     const t = Number(tax);
     const c = Number(commission);
+    const fee = Number(inspectionFee);
     if (!(t >= 0 && t <= 28) || !(c >= 0 && c <= 60)) {
       save.setError('GST must be 0–28% and commission 0–60%');
       return;
     }
-    await save.run({ taxRate: t / 100, defaultCommissionRate: c / 100 });
+    if (!(Number.isInteger(fee) && fee >= 0 && fee <= 10_000)) {
+      save.setError('Inspection fee must be a whole amount between ₹0 and ₹10,000');
+      return;
+    }
+    await save.run({ taxRate: t / 100, defaultCommissionRate: c / 100, defaultInspectionFee: fee });
     setSaved(true);
   };
 
@@ -33,6 +39,7 @@ export default function Settings() {
           {save.error ? <Banner tone="danger" icon="alert-circle" title={save.error} /> : saved ? <Banner tone="success" icon="checkmark-circle" title="Saved — applies to new bookings" /> : null}
           <TextField label="GST on services (%)" keyboardType="numeric" value={tax} onChangeText={(v) => { setTax(v); setSaved(false); }} />
           <TextField label="Default commission (%)" keyboardType="numeric" value={commission} onChangeText={(v) => { setCommission(v); setSaved(false); }} hint="Used when a category has no rate of its own. Categories override this." />
+          <TextField label="Default “Not sure” inspection fee (₹)" keyboardType="number-pad" value={inspectionFee} onChangeText={(v) => { setInspectionFee(v.replace(/\D/g, '')); setSaved(false); }} hint="Visit charge before GST when a customer can’t pick a problem. Categories can override it." />
           <View style={{ gap: 2 }}>
             <AppText variant="small">For a ₹1,000 job:</AppText>
             <KeyValue label="Customer pays" value={formatINR(example.total)} />
@@ -58,7 +65,7 @@ export default function Settings() {
           </Panel>
           <Panel title="Demo data">
             <AppText variant="small">This panel runs on a local mock backend. Reset restores the seeded users, vendors and bookings.</AppText>
-            <Button label="Reset demo data" size="sm" variant="danger" icon="refresh" onPress={async () => { if (await confirmAction('Reset demo data', 'All changes made in this browser will be lost.', 'Reset')) await backend.resetDemoData(); }} />
+            {backend.kind === 'mock' ? <Button label="Reset demo data" size="sm" variant="danger" icon="refresh" onPress={async () => { if (await confirmAction('Reset demo data', 'All changes made in this browser will be lost.', 'Reset')) await backend.resetDemoData(); }} /> : null}
           </Panel>
         </View>
       </Row>

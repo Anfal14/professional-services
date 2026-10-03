@@ -66,6 +66,13 @@ export default function Invoice() {
             <View style={{ flex: 1 }}>
               <AppText variant="label">{category?.name} — {bookingProblemNames(db, b).join(', ')}</AppText>
               <AppText variant="small">Booking #{b.code} · {formatDate(b.date)}, {b.slot}{vendor ? ` · by ${vendor.name}` : ''}</AppText>
+              {b.inspection ? (
+                <AppText variant="small">
+                  {b.inspection.status === 'approved' && b.inspection.quote
+                    ? `Approved repair: ${b.inspection.quote.lines.map((l) => `${l.description} ${formatINR(l.amount)}`).join(', ')}`
+                    : `Inspection visit ${formatINR(b.inspection.fee)}${b.inspection.status === 'no_work_needed' ? ' — no repair needed' : b.inspection.status === 'declined' ? ' — repair quote declined' : ''}`}
+                </AppText>
+              ) : null}
             </View>
             <AppText variant="bodyMedium">{formatINR(b.price.serviceAmount, { decimals: true })}</AppText>
           </View>

@@ -1,0 +1,106 @@
+spring:
+  application:
+    name: profecian-backend
+  profiles:
+    # "dev" loads the demo data migration and enables the sandbox OTP/payment providers.
+    default: dev
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/profecian}
+    username: ${DATABASE_USER:profecian}
+    password: ${DATABASE_PASSWORD:profecian}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
+        jdbc.time_zone: UTC
+  flyway:
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: framework
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+profecian:
+  # Comma-separated origins allowed to call the API (Expo web dev servers by default).
+  cors-origins: ${CORS_ORIGINS:http://localhost:8081,http://localhost:8082,http://localhost:8083,http://localhost:19006}
+  public-base-url: ${PUBLIC_BASE_URL:http://localhost:8080}
+  jwt:
+    # HS256 secret (min 32 bytes). Override in every non-dev environment.
+    secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+    access-ttl: PT15M
+    refresh-ttl: P30D
+    signup-ttl: PT15M
+  otp:
+    # Sandbox mode accepts the fixed code 123456 and does not send an SMS.
+    sandbox: true
+    ttl: PT5M
+    max-sends-per-window: 5
+    send-window: PT10M
+    max-attempts: 5
+  payments:
+    provider: sandbox
+    webhook-secret: ${PAYMENT_WEBHOOK_SECRET:dev-webhook-secret}
+  outbox:
+    poll-interval-ms: 2000
+    batch-size: 50
+    max-attempts: 6
+  storage:
+    provider: local
+    local-dir: ${STORAGE_DIR:./data/uploads}
+    url-ttl: PT1H
+    signing-secret: ${STORAGE_SIGNING_SECRET:dev-storage-secret}
+    s3:
+      bucket: ${S3_BUCKET:profecian}
+      region: ${S3_REGION:ap-south-1}
+      endpoint: ${S3_ENDPOINT:}
+  bank-encryption:
+    password: ${BANK_ENCRYPTION_PASSWORD:dev-bank-password}
+    salt: ${BANK_ENCRYPTION_SALT:5c0744940b5c369b}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  flyway:
+    locations: classpath:db/migration,classpath:db/dev
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+profecian:
+  otp:
+    sandbox: false
+  payments:
+    provider: razorpay
+  storage:
+    provider: s3

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { View } from 'react-native';
-import { BOOKING_STATUS, bookingProblemLabel, formatDate, formatINR, toISODate, useDb, type Booking } from '@profecian/shared';
+import { BOOKING_STATUS, bookingProblemLabel, formatDate, formatINR, INSPECTION_STATUS, isQuoteOpen, toISODate, useDb, type Booking } from '@profecian/shared';
 import { AppText, asIcon, Badge, Card, colors, radius, spacing, tintTile } from '@profecian/ui';
 
 export function JobCard({ job }: { job: Booking }) {
@@ -22,13 +22,20 @@ export function JobCard({ job }: { job: Booking }) {
         </View>
         <Badge label={s.label} tone={s.tone} />
       </View>
+      {job.inspection ? (
+        <Badge
+          label={`Not sure · ${job.inspection.awaitingCustomer ? 'Waiting for customer' : INSPECTION_STATUS[job.inspection.status].label}`}
+          tone={job.inspection.awaitingCustomer ? 'warning' : INSPECTION_STATUS[job.inspection.status].tone}
+          icon="help-circle-outline"
+        />
+      ) : null}
       <View style={{ gap: 6 }}>
         <Line icon="time-outline" text={`${today ? 'Today' : formatDate(job.date)}, ${job.slot}`} strong={today} />
         <Line icon="person-outline" text={job.customerName} />
         <Line icon="location-outline" text={`${job.address.line}, ${job.address.city}`} />
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border }}>
-        <AppText variant="small">You earn</AppText>
+        <AppText variant="small">{isQuoteOpen(job) ? 'You earn (inspection fee, until a quote is approved)' : 'You earn'}</AppText>
         <AppText variant="h3" color={colors.success}>{formatINR(job.price.vendorPayout)}</AppText>
       </View>
     </Card>

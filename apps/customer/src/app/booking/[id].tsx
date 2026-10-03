@@ -4,12 +4,11 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Linking, View } from 'react-native';
 import {
-  bookingProblemLabel, bookingProblemNames, BOOKING_STATUS, canCustomerModify, isSlotAvailable, formatDate, formatDateTime, formatINR, formatPhone, ONLINE_METHODS, PAYMENT_METHOD_LABEL, PAYMENT_STATUS,
+  bookingProblemLabel, bookingProblemNames, BOOKING_STATUS, canCustomerModify, canQuote, isQuoteOpen, isSlotAvailable, formatDate, formatDateTime, formatINR, formatPhone, ONLINE_METHODS, PAYMENT_METHOD_LABEL, PAYMENT_STATUS,
   suggestVendors, TRACKING_STEPS, useAction, useBackend, useDb, VENDOR_NEXT, type Booking, type PaymentMethod,
 } from '@profecian/shared';
 import {
-  asIcon, Banner, hasOpenSlots, Button as UiButton, Card, ChipGroup, DateSlotPicker, Divider, KeyValue, PhotoPicker, Sheet, StarInput, Stars, TextField, Timeline, Toggle,
-} from '@profecian/ui';
+  asIcon, Banner, hasOpenSlots, Button as UiButton, Card, ChipGroup, DateSlotPicker, Divider, KeyValue, PhotoPicker, Sheet, StarInput, Stars, TextField, Timeline, Toggle, ComposeSheet, confirmAction, InspectionPanel } from '@profecian/ui';
 import { AppText } from '@/components/AppText';
 import { Container } from '@/components/Container';
 import { EmptyState } from '@/components/EmptyState';
@@ -40,7 +39,9 @@ export default function BookingDetail() {
   const { isDesktop, isMobile } = useResponsive();
   const { getService } = useCatalog();
   const booking = db.bookings.find((b) => b.id === id && b.customerId === customer?.id);
-  const [sheet, setSheet] = useState<'pay' | 'reschedule' | 'cancel' | 'complaint' | null>(null);
+  const [sheet, setSheet] = useState<'pay' | 'reschedule' | 'cancel' | 'complaint' | 'reply' | null>(null);
+  const backend = useBackend();
+  const quote = useAction(backend.customer.respondToQuote);
 
   if (!customer) return <Redirect href={{ pathname: '/login', params: { next: `/booking/${id}` } }} />;
   if (!booking) {
@@ -58,10 +59,45 @@ export default function BookingDetail() {
   const cancelled = booking.status === 'cancelled';
   const modifiable = canCustomerModify(booking.status);
   const unpaid = !cancelled && booking.payment.status !== 'paid';
+  // "Not sure": the price is final only after inspection and the customer's answer to the quote.
+  const priceOpen = isQuoteOpen(booking);
+
+  const answerQuote = async (approve: boolean) => {
+    const amount = booking.inspection?.quote?.amount ?? 0;
+    const ok = await confirmAction(
+      approve ? 'Approve repair quote?' : 'Decline repair quote?',
+      approve
+        ? `The professional will go ahead with the repair for ${formatINR(amount)} + GST. It replaces the inspection fee.`
+        : `No repair will be done. You pay only the ${formatINR(booking.inspection?.fee ?? 0)} inspection fee + GST.`,
+      approve ? 'Approve' : 'Decline',
+    );
+    if (ok) await quote.run(customer.id, booking.id, approve);
+  };
 
   const left = (
     <View style={{ gap: spacing.lg }}>
       <LiveStatus booking={booking} />
+      {quote.error ? <Banner tone="danger" icon="alert-circle" title={quote.error} /> : null}
+      {booking.inspection ? (
+        <InspectionPanel
+          booking={booking}
+          categoryName={service?.name}
+          audience="customer"
+          actions={cancelled || booking.status === 'completed' ? null : (
+            <>
+              {booking.inspection.status === 'quoted' ? (
+                <>
+                  <UiButton label="Approve quote" icon="checkmark-circle" size="sm" variant="success" loading={quote.pending} onPress={() => answerQuote(true)} />
+                  <UiButton label="Decline" icon="close-circle-outline" size="sm" variant="outline" loading={quote.pending} onPress={() => answerQuote(false)} />
+                </>
+              ) : null}
+              {booking.inspection.awaitingCustomer ? (
+                <UiButton label="Reply" icon="chatbubble-ellipses-outline" size="sm" onPress={() => setSheet('reply')} />
+              ) : null}
+            </>
+          )}
+        />
+      ) : null}
       {vendor && !cancelled ? (
         <Card style={{ gap: spacing.md }}>
           <AppText variant="h3">Your professional</AppText>
@@ -109,7 +145,8 @@ export default function BookingDetail() {
           </View>
         ))}
         <Divider style={{ marginVertical: 6 }} />
-        <KeyValue label="Total (Inc. GST)" value={formatINR(booking.price.total)} strong />
+        <KeyValue label={priceOpen ? 'Inspection visit (Inc. GST)' : 'Total (Inc. GST)'} value={formatINR(booking.price.total)} strong />
+        {priceOpen ? <AppText variant="small">Final amount is confirmed when you approve or decline the repair quote.</AppText> : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
           <AppText variant="small">{cancelled ? 'Not charged' : `${PAYMENT_STATUS[booking.payment.status].label}${booking.payment.method ? ` · ${PAYMENT_METHOD_LABEL[booking.payment.method]}` : ''}`}</AppText>
         </View>
@@ -118,7 +155,7 @@ export default function BookingDetail() {
           <AppText variant="small" style={{ marginTop: 6 }}>You’ll pay {formatINR(booking.price.total)} in cash to your professional after the service.</AppText>
         ) : null}
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' }}>
-          {unpaid ? <UiButton label={booking.status === 'completed' ? `Pay ${formatINR(booking.price.total)}` : 'Pay now / choose method'} size="sm" icon="card-outline" onPress={() => setSheet('pay')} /> : null}
+          {unpaid && !priceOpen ? <UiButton label={booking.status === 'completed' ? `Pay ${formatINR(booking.price.total)}` : 'Pay now / choose method'} size="sm" icon="card-outline" onPress={() => setSheet('pay')} /> : null}
           {booking.payment.status === 'paid' ? <UiButton label="View invoice" size="sm" variant="secondary" icon="receipt-outline" onPress={() => router.push(`/invoice/${booking.id}`)} /> : null}
         </View>
       </Card>
@@ -178,11 +215,21 @@ export default function BookingDetail() {
       {sheet === 'reschedule' ? <RescheduleSheet booking={booking} onClose={() => setSheet(null)} /> : null}
       {sheet === 'cancel' ? <CancelSheet booking={booking} onClose={() => setSheet(null)} /> : null}
       {sheet === 'complaint' ? <ComplaintSheet booking={booking} onClose={() => setSheet(null)} /> : null}
+      <ComposeSheet
+        visible={sheet === 'reply'}
+        onClose={() => setSheet(null)}
+        title="Reply"
+        label="Your answer"
+        placeholder="Type your answer"
+        hint="Shared with your professional and our support team."
+        submitLabel="Send reply"
+        onSubmit={(text) => backend.customer.answerClarification(customer.id, booking.id, text)}
+      />
     </Screen>
   );
 }
 
-function Line({ icon, text }: { icon: 'calendar-outline' | 'location-outline' | 'call-outline' | 'chatbox-ellipses-outline'; text: string }) {
+function Line({ icon, text }: { icon: 'calendar-outline' | 'location-outline' | 'call-outline' | 'chatbox-ellipses-outline' | 'help-circle-outline'; text: string }) {
   return (
     <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
       <Ionicons name={icon} size={17} color={colors.primary} style={{ marginTop: 2 }} />
@@ -221,9 +268,14 @@ function LiveStatus({ booking }: { booking: Booking }) {
       if (booking.status === 'pending_assignment') {
         const best = suggestVendors(db, booking).find((s) => s.matchesService && s.available) ?? suggestVendors(db, booking)[0];
         if (best) await backend.admin.assignVendor(booking.id, best.vendor.id);
-      } else if (booking.vendorId && VENDOR_NEXT[booking.status]) {
+      } else if (booking.vendorId && canQuote(booking)) {
+        const fee = booking.inspection?.fee ?? 0;
+        await backend.vendor.shareQuote(booking.vendorId, booking.id, [{ description: 'Repair as found during inspection (demo quote)', amount: fee * 3 }], 'Demo quote');
+      } else if (booking.vendorId && VENDOR_NEXT[booking.status] && !(VENDOR_NEXT[booking.status] === 'completed' && isQuoteOpen(booking))) {
         await backend.vendor.advanceJob(booking.vendorId, booking.id);
       }
+    } catch {
+      // Demo control only — the real flows show their own errors.
     } finally {
       setSimulating(false);
     }
@@ -257,7 +309,7 @@ function LiveStatus({ booking }: { booking: Booking }) {
       {!cancelled && compact ? (
         <AppText variant="small">Step {idx + 1} of {TRACKING_STEPS.length} · {STEP_LABEL[booking.status]}</AppText>
       ) : null}
-      {!cancelled && booking.status !== 'completed' ? (
+      {!cancelled && booking.status !== 'completed' && backend.kind === 'mock' ? (
         <View style={{ gap: 4 }}>
           <UiButton label={simulating ? 'Updating…' : 'Simulate next update'} size="sm" variant="ghost" icon="flask-outline" loading={simulating} onPress={simulate} />
           <AppText variant="tiny">Demo only — in production this updates live as the admin assigns a professional and they progress through the job.</AppText>

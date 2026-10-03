@@ -2,19 +2,21 @@ import Head from 'expo-router/head';
 import { Redirect } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
-import { DEMO, ROLE_PERMISSIONS, useAction, useBackend, useSession } from '@profecian/shared';
+import { DEMO, ROLE_PERMISSIONS, useAction, useBackend } from '@profecian/shared';
+import { useAdmin } from '@/components/admin';
 import { AppText, Banner, Button, Card, colors, fonts, gradients, radius, spacing, TextField, createStyles } from '@profecian/ui';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function AdminLogin() {
   const backend = useBackend();
-  const session = useSession();
+  // Same check as the panel layout (admin record present), so the two redirects can never disagree.
+  const admin = useAdmin();
   const [email, setEmail] = useState<string>(DEMO.adminEmail);
   const [password, setPassword] = useState('');
   const login = useAction(backend.admin.login);
 
-  if (session?.role === 'admin') return <Redirect href="/" />;
+  if (admin) return <Redirect href="/" />;
 
   const submit = () => {
     if (!email.trim() || !password) {

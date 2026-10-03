@@ -1,7 +1,7 @@
 # Project Memory — Profecian
 
 ## Purpose
-Home-services platform (Urban Company style), rebranded from "QuickJob" by the user. Three frontends: customer app, vendor ("Partner") app, admin web panel. **Backend/DB not decided** — user asked for frontend flow only, third parties stubbed ("stub now, wire later").
+Home-services platform (Urban Company style), rebranded from "QuickJob" by the user. Three Expo frontends (customer, vendor "Partner", admin web) plus a Spring Boot backend in `backend/` (2026-10-02). Apps use the offline mock unless `EXPO_PUBLIC_API_URL` points at the backend.
 
 ## Stack
 npm-workspaces monorepo. Expo SDK 57, RN 0.86, React 19.2, Expo Router (`src/app` in each app), TS strict, react-native-web, react-native-svg (charts + roadmap). Do not upgrade Expo/RN; `npx expo install` inside the app folder.
@@ -10,7 +10,7 @@ npm-workspaces monorepo. Expo SDK 57, RN 0.86, React 19.2, Expo Router (`src/app
 `apps/customer` (8081) · `apps/vendor` (8082) · `apps/admin` (8083, web-first) · `packages/shared` (types, seed, pricing, statuses, notify, analytics, mock backend, hooks) · `packages/ui` (theme, primitives, widgets, OtpLogin, Charts). Details: `ARCHITECTURE.md`.
 
 ## Backend (mock)
-`createMockBackend` in `packages/shared/src/mock.ts`: in-memory `Database`, persisted per app at `@profecian/<app>/db/v${DB_VERSION}` (DB_VERSION 4 — bump when seed/shape changes). Apps **do not share state**; each starts from the same deterministic seed. Screens only call `backend.customer|vendor|admin.*` / hooks (`useDb`, `useSession`, `useAction`).
+`createMockBackend` in `packages/shared/src/mock.ts`: in-memory `Database`, persisted per app at `@profecian/<app>/db/v${DB_VERSION}` (DB_VERSION 6 — bump when seed/shape changes). Apps **do not share state**; each starts from the same deterministic seed. Screens only call `backend.customer|vendor|admin.*` / hooks (`useDb`, `useSession`, `useAction`).
 
 ## Demo
 Customer 9876500001 · Vendor 9876500101 (approved) / 9876500109 (pending) · OTP 123456 · Admin admin@profecian.app / Admin@123 (+ ops@/finance@/support@ roles).
@@ -27,6 +27,9 @@ Business details in `apps/customer/src/config.ts`, GSTIN on invoice, Unsplash im
 
 ## Repo / infra
 Git root `Documents/professional-services`, remote `https://github.com/Anfal14/professional-services.git`, `main` pushed to `63ce6ae`. The monorepo restructure + platform (2026-09-28) is **uncommitted** — commit/push when asked. Old `professional-services/QuickJob/` folder is a stale copy (gitignored, was locked by a shell); `Documents/QuickJob` is also obsolete (holds only the session `.claude/launch.json`).
+
+## Backend
+Java 21 / Spring Boot 3.5.16 in `backend/` — see `features/backend.md`. Run: `npm run backend:up` (docker compose: Postgres+PostGIS :5433, Redis :6379), then `npm run backend` (:8080, Swagger /swagger-ui.html). Tests: `npm run backend:test`. After editing seed.ts run `npm run backend:seed`. Docker Desktop installed 2026-10-02; `npm run backend:test` = 15 unit + 11 Testcontainers ITs, all passing. Full e2e (customer → admin → vendor → payment → review) verified 2026-10-02 against the live backend with live STOMP updates. Point an app at it with `EXPO_PUBLIC_API_URL=http://localhost:8080` in `apps/<app>/.env.local` (gitignored). The HTTP client only exposes a session whose user is in the snapshot (`visibleSession`) — keep it that way or login/layout redirects loop.
 
 ## Verification
 Root: `npm run typecheck`, `npm run lint`. Per app: `npx expo-doctor`, `npx expo export --platform web` (+ android/ios for customer/vendor). All clean on 2026-09-28.

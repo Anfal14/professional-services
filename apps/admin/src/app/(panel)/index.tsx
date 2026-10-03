@@ -2,8 +2,7 @@ import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { View } from 'react-native';
 import {
-  BOOKING_STATUS, can, dailySeries, formatDate, formatINR, formatINRCompact, kpis, timeAgo, VENDOR_STATUS,
-} from '@profecian/shared';
+  BOOKING_STATUS, can, dailySeries, formatDate, formatINR, formatINRCompact, kpis, timeAgo, VENDOR_STATUS, inspectionNeedsAttention, } from '@profecian/shared';
 import { AppText, Badge, Button, colors, LineChart, spacing, StatCard } from '@profecian/ui';
 import { Cell, DataTable, Page, Panel, Row, useAdmin } from '@/components/admin';
 import { useLookups } from '@/components/lookups';
@@ -43,6 +42,7 @@ export default function Dashboard() {
         <Panel title="Needs attention">
           <View style={{ gap: spacing.md }}>
             <Attention icon="hourglass-outline" tone="warning" label={`${pending.length} bookings waiting for a professional`} action="Assign" onPress={() => router.navigate('/assign')} />
+            <Attention icon="help-circle-outline" tone="warning" label={`${db.bookings.filter(inspectionNeedsAttention).length} “Not sure” requests need follow-up`} action="Review" onPress={() => router.navigate('/bookings?filter=not_sure' as never)} />
             <Attention icon="shield-outline" tone="info" label={`${pendingVendors.length} vendors pending KYC approval`} action="Review" onPress={() => router.navigate('/vendors')} />
             <Attention icon="alert-circle-outline" tone="danger" label={`${k.openComplaints} open complaints`} action="Open" onPress={() => router.navigate('/reviews')} />
             <Attention icon="card-outline" tone="danger" label={`${db.bookings.filter((b) => b.payment.status === 'failed').length} failed payments`} action="View" onPress={() => router.navigate('/payments')} />
@@ -96,7 +96,7 @@ export default function Dashboard() {
   );
 }
 
-function Attention({ icon, tone, label, action, onPress }: { icon: 'hourglass-outline' | 'shield-outline' | 'alert-circle-outline' | 'card-outline'; tone: 'warning' | 'info' | 'danger'; label: string; action: string; onPress: () => void }) {
+function Attention({ icon, tone, label, action, onPress }: { icon: 'hourglass-outline' | 'help-circle-outline' | 'shield-outline' | 'alert-circle-outline' | 'card-outline'; tone: 'warning' | 'info' | 'danger'; label: string; action: string; onPress: () => void }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
       <Badge label="" tone={tone} icon={icon} />
