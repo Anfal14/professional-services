@@ -8,6 +8,8 @@ import com.profecian.files.FileRefs;
 import com.profecian.live.LiveEvents;
 import com.profecian.notifications.NotificationService;
 import com.profecian.notifications.NotifyFor;
+import com.profecian.settings.City;
+import com.profecian.settings.CityService;
 import com.profecian.settings.SettingsService;
 import java.time.Clock;
 import java.util.List;
@@ -27,6 +29,7 @@ public class VendorService {
 
   private final VendorRepository vendors;
   private final SettingsService settings;
+  private final CityService cities;
   private final NotificationService notifications;
   private final NotifyFor notify;
   private final FileRefs files;
@@ -34,10 +37,11 @@ public class VendorService {
   private final LiveEvents live;
   private final Clock clock;
 
-  public VendorService(VendorRepository vendors, SettingsService settings, NotificationService notifications, NotifyFor notify, FileRefs files,
+  public VendorService(VendorRepository vendors, SettingsService settings, CityService cities, NotificationService notifications, NotifyFor notify, FileRefs files,
                        TextEncryptor bankEncryptor, LiveEvents live, Clock clock) {
     this.vendors = vendors;
     this.settings = settings;
+    this.cities = cities;
     this.notifications = notifications;
     this.notify = notify;
     this.files = files;
@@ -61,18 +65,19 @@ public class VendorService {
     if (vendors.existsByPhone(phone)) throw ApiException.conflict("A vendor account already exists for this number");
     if (categoryIds == null || categoryIds.isEmpty()) throw ApiException.bad("Select at least one service category");
     if (name == null || name.trim().length() < 2) throw ApiException.bad("Please enter your full name");
+    City home = cities.requireVendorCity(city);
     Vendor v = new Vendor();
     v.id = Ids.newId("ven");
     v.name = name.trim();
     v.phone = phone;
     v.email = email == null || email.isBlank() ? null : email.trim();
-    v.city = city;
+    v.city = home.name;
     v.serviceAreas.addAll(serviceAreas == null ? List.of() : serviceAreas);
     v.categoryIds.addAll(categoryIds);
     v.status = "pending";
     ALL_DOCS.forEach(t -> v.kyc.add(new Vendor.KycDocument(t, "missing")));
     v.available = false;
-    double[] loc = settings.jitterNear(city, phone);
+    double[] loc = settings.jitterNear(home.name, phone);
     v.lat = loc[0];
     v.lng = loc[1];
     v.joinedAt = clock.instant();

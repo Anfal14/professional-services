@@ -7,9 +7,12 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:mock": "node scripts/dev.mjs --mock",
     "customer": "npm run web --workspace @profecian/customer",
     "vendor": "npm run web --workspace @profecian/vendor",
     "admin": "npm run web --workspace @profecian/admin",
+    "test": "tsx --test packages/shared/test/city-pricing.test.ts packages/shared/test/vendor-job.test.ts packages/shared/test/release.test.ts packages/shared/test/extra-work.test.ts",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "backend:seed": "tsx backend/scripts/generate-dev-seed.ts",

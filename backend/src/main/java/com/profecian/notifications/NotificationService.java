@@ -6,6 +6,8 @@ import com.profecian.common.Formats;
 import com.profecian.common.Ids;
 import com.profecian.common.Phones;
 import com.profecian.live.LiveEvents;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,16 @@ public class NotificationService {
 
   @Transactional(propagation = Propagation.MANDATORY)
   public void publish(List<Draft> drafts) {
+    publish(drafts, Duration.ZERO);
+  }
+
+  /**
+   * As {@link #publish(List)}, but the outbox rows (push / WhatsApp / SMS) become due only after
+   * `sendAfter` — used for steps that can still be undone, see {@link #retract}.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void publish(List<Draft> drafts, Duration sendAfter) {
+    Instant due = Instant.now().plus(sendAfter);
     for (Draft d : drafts) {
       Notification n = new Notification();
       n.id = Ids.newId("ntf");
@@ -50,13 +62,13 @@ public class NotificationService {
 
       for (String channel : d.channels()) {
         switch (channel) {
-          case "push" -> enqueue(n, "push", d.audience() + ":" + d.recipientId(), Map.of("title", d.title(), "body", d.body()));
+          case "push" -> enqueue(n, "push", d.audience() + ":" + d.recipientId(), Map.of("title", d.title(), "body", d.body()), due);
           case "whatsapp" -> {
-            if (d.whatsappTo() != null) enqueue(n, "whatsapp", Phones.normalize(d.whatsappTo()), Map.of("text", whatsappText));
+            if (d.whatsappTo() != null) enqueue(n, "whatsapp", Phones.normalize(d.whatsappTo()), Map.of("text", whatsappText), due);
           }
           case "sms" -> {
             // Recipients are addressed by id; the worker resolves the phone number at send time.
-            enqueue(n, "sms", d.audience() + ":" + d.recipientId(), Map.of("text", d.title() + ": " + d.body()));
+            enqueue(n, "sms", d.audience() + ":" + d.recipientId(), Map.of("text", d.title() + ": " + d.body()), due);
           }
           default -> { } // in_app: the row above is the delivery
         }
@@ -65,8 +77,18 @@ public class NotificationService {
     }
   }
 
-  private void enqueue(Notification n, String channel, String destination, Map<String, String> payload) {
+  /**
+   * Takes back the notifications of these kinds created for a booking since `since`, with their
+   * unsent outbox rows (deleted by the foreign key) — the step they announced was undone.
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void retract(String bookingId, Instant since, List<String> kinds, String audience, String recipientId) {
+    if (notifications.deleteByBookingSince(bookingId, since, kinds) > 0) live.notify(audience, recipientId, bookingId);
+  }
+
+  private void enqueue(Notification n, String channel, String destination, Map<String, String> payload, Instant due) {
     OutboxMessage m = new OutboxMessage();
+    m.nextAttemptAt = due;
     m.notificationId = n.id;
     m.channel = channel;
     m.destination = destination;

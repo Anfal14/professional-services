@@ -1,7 +1,8 @@
 import type { ComponentProps } from 'react';
 import { useMemo } from 'react';
 import type Ionicons from '@expo/vector-icons/Ionicons';
-import { inspectionFeeFor, useDb, type Database, type PricingModel } from '@profecian/shared';
+import { findCity, inspectionFeeIn, isCategoryOfferedIn, problemPriceIn, useDb, type City, type Database, type PricingModel } from '@profecian/shared';
+import { useLocation } from '@/context/LocationContext';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -50,9 +51,10 @@ const formatCount = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}K` : St
 
 /**
  * Maps the admin-managed catalogue (@profecian/shared) to the Service shape
- * the customer screens use. Only enabled categories/problem types appear.
+ * the customer screens use. Only enabled categories/problem types appear. Prices are the ones
+ * charged in `city` (its price level, or an exact price set for it); with no city, the base prices.
  */
-export function buildServices(db: Database): Service[] {
+export function buildServices(db: Database, city?: City): Service[] {
   return [...db.categories]
     .filter((c) => c.enabled)
     .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -70,8 +72,8 @@ export function buildServices(db: Database): Service[] {
         tint: c.tint,
         rating,
         reviews: formatCount(reviews.length),
-        startingPrice: problems.length ? Math.min(...problems.map((p) => p.price)) : 0,
-        inspectionFee: inspectionFeeFor(c, db.settings),
+        startingPrice: problems.length ? Math.min(...problems.map((p) => problemPriceIn(p, city))) : 0,
+        inspectionFee: inspectionFeeIn(c, db.settings, city),
         eta: '45 mins',
         popular: c.popular,
         includes: c.includes,
@@ -79,7 +81,7 @@ export function buildServices(db: Database): Service[] {
           id: p.id,
           title: p.name,
           description: p.description,
-          price: p.price,
+          price: problemPriceIn(p, city),
           duration: formatDuration(p.durationMins),
           icon: p.icon as IconName,
           pricingModel: p.pricingModel,
@@ -90,13 +92,25 @@ export function buildServices(db: Database): Service[] {
 }
 
 
+/**
+ * The catalogue as the customer sees it in their current city: `services` leaves out categories that
+ * city doesn't offer, and every price is that city's. `getService` finds any service (past
+ * bookings, carts from another city).
+ */
 export function useCatalog() {
   const db = useDb();
+  const { cityInfo } = useLocation();
   return useMemo(() => {
-    const services = buildServices(db);
+    const allServices = buildServices(db, cityInfo);
+    // An unknown city (not loaded yet, or not served) keeps the full list; booking is blocked elsewhere.
+    const offered = (id: string) => !cityInfo || isCategoryOfferedIn(cityInfo, id);
+    const services = allServices.filter((s) => offered(s.id));
     return {
       services,
-      getService: (id: string | undefined) => services.find((s) => s.id === id),
+      allServices,
+      /** Whether the current city offers this service. */
+      isOffered: offered,
+      getService: (id: string | undefined) => allServices.find((s) => s.id === id),
       searchServices: (query: string) => {
         const q = query.trim().toLowerCase();
         if (!q) return services;
@@ -105,7 +119,7 @@ export function useCatalog() {
         );
       },
     };
-  }, [db]);
+  }, [db, cityInfo]);
 }
 
 export const stats = [
@@ -151,6 +165,19 @@ export function otherIssue(service: Service): Issue {
     icon: 'help-circle-outline',
     pricingModel: 'inspection',
   };
+}
+
+/**
+ * The cart's pre-tax total at the prices the customer saw when adding each item (every item remembers
+ * the city it was added in). Items with no remembered city count at `current` prices.
+ */
+export function cartSeenSubtotal(db: Database, items: { serviceId: string; issueId: string; city?: string }[], current: City | undefined): number {
+  const cities = [...new Set(items.map((i) => i.city ?? current?.name))];
+  return cities.reduce((sum, name) => {
+    const city = name === current?.name ? current : findCity(db.settings, name);
+    const mine = items.filter((i) => (i.city ?? current?.name) === name);
+    return sum + groupCart(buildServices(db, city), mine).reduce((s, g) => s + g.subtotal, 0);
+  }, 0);
 }
 
 export interface CartLine {

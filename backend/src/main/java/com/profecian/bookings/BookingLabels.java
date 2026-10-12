@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class BookingLabels {
   public static final String INSPECTION_LABEL = "Not sure — needs inspection";
+  public static final String EXTRA_WORK_LABEL = "Extra work";
 
   private final CategoryRepository categories;
   private final ProblemTypeRepository problemTypes;
@@ -26,7 +27,7 @@ public class BookingLabels {
   public List<String> problemNames(Booking b) {
     List<String> names = new ArrayList<>(b.items.stream().map(i -> i.name).toList());
     if (names.isEmpty() && b.problemTypeId != null) problemTypes.findById(b.problemTypeId).ifPresent(p -> names.add(p.name));
-    if (b.inspection != null) names.add(INSPECTION_LABEL);
+    if (b.inspection != null) names.add(b.inspection.isExtraWork() ? EXTRA_WORK_LABEL : INSPECTION_LABEL);
     return names;
   }
 

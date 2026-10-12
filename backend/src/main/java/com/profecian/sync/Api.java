@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Wire shapes — field-for-field the TypeScript types in packages/shared/src/types.ts, so the
@@ -17,7 +18,7 @@ public final class Api {
                                 boolean enabled, boolean popular, BigDecimal commissionRate, Integer inspectionFee, List<String> includes, int sortOrder) {}
 
   public record ProblemType(String id, String categoryId, String name, String description, String icon, BigDecimal price,
-                            String pricingModel, int durationMins, boolean enabled) {}
+                            String pricingModel, int durationMins, boolean enabled, Map<String, BigDecimal> cityPrices) {}
 
   public record Address(String id, String label, String line, String landmark, String city, String pincode, Double lat, Double lng) {}
 
@@ -34,7 +35,7 @@ public final class Api {
   public record Vendor(String id, String name, String phone, String email, String photo, String city, List<String> serviceAreas,
                        List<String> categoryIds, String status, List<KycDocument> kyc, BankAccount bank, boolean available,
                        WorkingHours workingHours, BigDecimal rating, int ratingCount, int jobsCompleted, Location location,
-                       Instant joinedAt, Instant kycSubmittedAt, String rejectionReason) {}
+                       Instant joinedAt, Instant kycSubmittedAt, String rejectionReason, Integer acceptedJobs, Integer lateReleases) {}
 
   public record AdminUser(String id, String name, String email, String role) {}
 
@@ -50,15 +51,18 @@ public final class Api {
 
   public record InspectionQuote(List<QuoteLine> lines, BigDecimal amount, String note, String vendorId, Instant createdAt, Instant respondedAt, String respondedBy) {}
 
-  public record ClarificationMessage(String id, String from, String authorName, String text, Instant at) {}
-
   public record InspectionRequest(String description, List<String> photos, int fee, String status, InspectionQuote quote,
-                                  List<ClarificationMessage> messages, boolean awaitingCustomer, String noWorkNote) {}
+                                  String noWorkNote, String kind) {}
 
   public record Booking(String id, String code, String customerId, String customerName, String customerPhone, String categoryId,
                         String problemTypeId, List<BookingItem> items, InspectionRequest inspection, LocalDate date, String slot,
                         Address address, String notes, String status, String vendorId, PriceBreakdown price, BookingPayment payment,
-                        List<String> proofPhotos, List<BookingEvent> timeline, Instant createdAt, String cancelReason, String reviewId) {}
+                        List<String> proofPhotos, List<BookingEvent> timeline, Instant createdAt, String cancelReason, String reviewId,
+                        List<String> afterPhotos, String startCode, List<JobRelease> releases, Boolean urgent, JobIssue issue) {}
+
+  public record JobRelease(String vendorId, String vendorName, String reason, String note, boolean late, Instant at) {}
+
+  public record JobIssue(String kind, String reason, String note, String vendorId, String vendorName, Instant at) {}
 
   public record Review(String id, String bookingId, String customerId, String customerName, String vendorId, String categoryId,
                        int rating, String text, List<String> images, String status, Instant createdAt) {}
@@ -71,8 +75,11 @@ public final class Api {
   public record AppNotification(String id, String audience, String recipientId, String kind, String title, String body,
                                 List<String> channels, String bookingId, String whatsappUrl, boolean read, Instant createdAt) {}
 
-  public record PlatformSettings(BigDecimal taxRate, BigDecimal defaultCommissionRate, int defaultInspectionFee, List<String> cities,
+  public record PlatformSettings(BigDecimal taxRate, BigDecimal defaultCommissionRate, int defaultInspectionFee, List<City> cities,
                                  String whatsappNumber, String supportPhone) {}
+
+  public record City(String name, String state, String status, double lat, double lng, int radiusKm, List<String> areas, List<String> disabledCategoryIds,
+                     int priceLevel, BigDecimal commissionRate) {}
 
   /** The whole snapshot a client renders from — `Database` in types.ts, scoped to the caller. */
   public record Database(int version, List<ServiceCategory> categories, List<ProblemType> problemTypes, List<Customer> customers,

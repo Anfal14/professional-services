@@ -100,15 +100,18 @@ const EVENT_LABEL: Record<string, string> = {
   payment_received: 'Payment received',
   payment_failed: 'Payment failed',
   reviewed: 'Review submitted',
-  clarification_requested: 'Question for the customer',
-  clarification_answered: 'Customer replied',
   quote_shared: 'Repair quote shared',
   quote_approved: 'Quote approved',
   quote_declined: 'Quote declined',
   no_work_needed: 'Inspected — no repair needed',
+  step_undone: 'Step undone',
+  released: 'Released by the professional',
+  issue_reported: 'Problem reported on site',
+  issue_resolved: 'Problem resolved',
 };
 
-export function Timeline({ events }: { events: BookingEvent[] }) {
+/** `labels` overrides the wording of some events for the audience (e.g. the customer). */
+export function Timeline({ events, labels }: { events: BookingEvent[]; labels?: Partial<Record<BookingEvent['kind'], string>> }) {
   return (
     <View>
       {events.map((e, i) => {
@@ -123,7 +126,7 @@ export function Timeline({ events }: { events: BookingEvent[] }) {
               {!last ? <View style={styles.tlLine} /> : null}
             </View>
             <View style={{ flex: 1, paddingBottom: last ? 0 : spacing.lg }}>
-              <AppText variant="label">{meta?.label ?? EVENT_LABEL[e.kind] ?? e.kind}</AppText>
+              <AppText variant="label">{labels?.[e.kind] ?? meta?.label ?? EVENT_LABEL[e.kind] ?? e.kind}</AppText>
               <AppText variant="small">{formatDateTime(e.at)} · by {e.by}</AppText>
               {e.note ? <AppText variant="small" color={colors.text}>{e.note}</AppText> : null}
             </View>

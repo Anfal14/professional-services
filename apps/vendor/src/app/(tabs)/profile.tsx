@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { DOC_STATUS, formatPhone, KYC_LABEL, useBackend, useDb } from '@profecian/shared';
+import { DOC_STATUS, findCity, formatPhone, KYC_LABEL, RELIABILITY_LOW, RELIABILITY_MIN_ACCEPTED, reliabilityLabel, reliabilityOf, useBackend, useDb } from '@profecian/shared';
 import {
   AppText, Avatar, Badge, Button, Card, ChipGroup, colors, confirmAction, Divider, FieldShell, KeyValue, SectionTitle, spacing, TextField, Toggle, AppearanceSettings } from '@profecian/ui';
 import { useVendor } from '@/backend';
@@ -15,6 +15,10 @@ export default function Profile() {
   const db = useDb();
   const backend = useBackend();
   const [area, setArea] = useState('');
+  // The city's known localities the vendor hasn't added yet.
+  const suggestedAreas = (findCity(db.settings, vendor.city)?.areas ?? []).filter((a) => !vendor.serviceAreas.includes(a));
+  const reliability = reliabilityOf(db, vendor);
+  const lowRate = reliability.rate != null && reliability.rate < RELIABILITY_LOW;
   const wh = vendor.workingHours;
   const update = (patch: Parameters<typeof backend.vendor.updateProfile>[1]) => backend.vendor.updateProfile(vendor.id, patch);
 
@@ -55,9 +59,32 @@ export default function Profile() {
         </FieldShell>
       </Card>
 
+      <Card style={{ gap: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <AppText variant="h3">Completion rate</AppText>
+            <AppText variant="small">
+              {reliability.rate == null
+                ? `Shown once you have accepted ${RELIABILITY_MIN_ACCEPTED} jobs (${reliability.accepted} so far).`
+                : `${reliability.accepted} jobs accepted · ${reliability.lateReleases} released late`}
+            </AppText>
+          </View>
+          <AppText variant="h1" color={lowRate ? colors.danger : reliability.rate == null ? colors.muted : colors.success}>{reliabilityLabel(reliability)}</AppText>
+        </View>
+        <AppText variant="small">
+          Only late releases count — giving a job back with 2 hours or less to go, or once you are on the way. Declining an offer or releasing early doesn’t. A higher rate gets you more jobs.
+        </AppText>
+      </Card>
+
       <Card style={{ gap: spacing.md }}>
         <AppText variant="h3">Service areas</AppText>
         <ChipGroup multi value={vendor.serviceAreas} onChange={(a) => update({ serviceAreas: vendor.serviceAreas.filter((x) => x !== a) })} options={vendor.serviceAreas.map((a) => ({ value: a, label: `${a}  ✕` }))} />
+        {suggestedAreas.length ? (
+          <View style={{ gap: spacing.xs }}>
+            <AppText variant="small">More localities in {vendor.city}</AppText>
+            <ChipGroup multi value={[]} onChange={(a) => update({ serviceAreas: [...vendor.serviceAreas, a] })} options={suggestedAreas.map((a) => ({ value: a, label: `+ ${a}` }))} />
+          </View>
+        ) : null}
         <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-end' }}>
           <View style={{ flex: 1 }}><TextField placeholder="Add a locality" value={area} onChangeText={setArea} onSubmitEditing={() => { if (area.trim()) { update({ serviceAreas: [...vendor.serviceAreas, area.trim()] }); setArea(''); } }} /></View>
           <Button label="Add" variant="secondary" disabled={!area.trim()} onPress={() => { update({ serviceAreas: [...vendor.serviceAreas, area.trim()] }); setArea(''); }} />

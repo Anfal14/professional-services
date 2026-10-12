@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Linking, ScrollView, StyleSheet, View } from "react-native";
 import { AppText } from "@/components/AppText";
 import { Button } from "@/components/Button";
+import { CityNotice } from "@/components/CityNotice";
 import { Container } from "@/components/Container";
 import { FadeIn } from "@/components/FadeIn";
 import { Grid } from "@/components/Grid";
@@ -243,6 +244,7 @@ export default function HomeScreen() {
           actionLabel="View all"
           onAction={() => router.push("/services")}
         />
+        <CityNotice style={{ marginBottom: spacing.lg }} />
         <Grid
           columns={select({ mobile: 2, tablet: 3, desktop: 4 })}
           gap={isMobile ? 12 : 20}

@@ -6,7 +6,6 @@ import { useBackend, type Address } from '@profecian/shared';
 import { AppText, Banner, ChipGroup, confirmAction, Sheet, type WebPressableState } from '@profecian/ui';
 import { useCustomer } from '@/backend';
 import { formatFullAddress, useLocation } from '@/context/LocationContext';
-import { CITIES } from '@/data/locations';
 import { detectCurrentLocation, LocationError, type CurrentLocation } from '@/services/locationApi';
 import { colors, createStyles, fonts, radius, spacing } from '@/theme';
 import { AddressSheet } from './AddressSheet';
@@ -22,7 +21,7 @@ export function LocationSheet({ visible, onClose, checkout = false }: { visible:
   const customer = useCustomer();
   const backend = useBackend();
   const pathname = usePathname();
-  const { selection, selectedAddress, addresses, selectAddress, selectCity, selectCurrent, city } = useLocation();
+  const { selection, selectedAddress, addresses, selectAddress, selectCity, selectCurrent, city, liveCities, comingSoonCities } = useLocation();
   const [detecting, setDetecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<{ address?: Address; prefill?: CurrentLocation } | null>(null);
@@ -36,7 +35,7 @@ export function LocationSheet({ visible, onClose, checkout = false }: { visible:
     setError(null);
     setDetecting(true);
     try {
-      const current = await detectCurrentLocation();
+      const current = await detectCurrentLocation(liveCities);
       if (checkout) {
         if (!customer) return requireLogin();
         setForm({ prefill: current });
@@ -140,8 +139,11 @@ export function LocationSheet({ visible, onClose, checkout = false }: { visible:
                   selectCity(c);
                   onClose();
                 }}
-                options={CITIES.map((c) => ({ value: c, label: c }))}
+                options={liveCities.map((c) => ({ value: c.name, label: c.name }))}
               />
+              {comingSoonCities.length ? (
+                <AppText variant="small">Coming soon: {comingSoonCities.map((c) => c.name).join(', ')}</AppText>
+              ) : null}
             </View>
           ) : null}
         </View>

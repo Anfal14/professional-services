@@ -1,7 +1,7 @@
 import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { formatPhone, useAction, useBackend, useDb } from '@profecian/shared';
+import { formatPhone, liveCities, useAction, useBackend, useDb } from '@profecian/shared';
 import { Banner, ChipGroup, FieldShell } from '@profecian/ui';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
@@ -68,7 +68,7 @@ export default function AccountScreen() {
             <TextField label="Full Name" required value={name} onChangeText={setName} autoCapitalize="words" />
             <TextField label="Email" optional value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
             <FieldShell label="City">
-              <ChipGroup value={city} onChange={setCity} options={db.settings.cities.map((c) => ({ value: c, label: c }))} />
+              <ChipGroup value={city} onChange={setCity} options={liveCities(db.settings).map((c) => ({ value: c.name, label: c.name }))} />
             </FieldShell>
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
               <Button label="Save" loading={save.pending} onPress={submit} />

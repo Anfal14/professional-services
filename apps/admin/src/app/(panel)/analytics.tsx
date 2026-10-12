@@ -1,8 +1,9 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
-import { cityPerformance, dailySeries, formatDate, formatINR, formatINRCompact, topServices, topVendors, useDb } from '@profecian/shared';
+import { cityPerformance, dailySeries, formatDate, formatINR, formatINRCompact, topServices, topVendors } from '@profecian/shared';
 import { AppText, BarList, Button, ColumnChart, LineChart, spacing } from '@profecian/ui';
 import { Cell, DataTable, Page, Panel, Row, Tabs } from '@/components/admin';
+import { useCityScope, useScopedDb } from '@/components/cityScope';
 
 /** Chart with a table-view toggle so values are never locked inside the graphic. */
 function ChartPanel({ title, chart, table }: { title: string; chart: ReactNode; table: ReactNode }) {
@@ -15,7 +16,8 @@ function ChartPanel({ title, chart, table }: { title: string; chart: ReactNode; 
 }
 
 export default function Analytics() {
-  const db = useDb();
+  const db = useScopedDb();
+  const { city } = useCityScope();
   const [range, setRange] = useState<'30' | '60'>('30');
   const days = Number(range);
   const series = useMemo(() => dailySeries(db, days), [db, days]);
@@ -39,7 +41,7 @@ export default function Analytics() {
   );
 
   return (
-    <Page title="Analytics" subtitle={`Last ${days} days · ${formatINR(totals.revenue)} collected from ${totals.bookings} bookings (${totals.cancelled} cancelled).`} permission="analytics"
+    <Page title="Analytics" cityFilter subtitle={`${city ? `${city} · ` : ''}Last ${days} days · ${formatINR(totals.revenue)} collected from ${totals.bookings} bookings (${totals.cancelled} cancelled).`} permission="analytics"
       actions={<Tabs value={range} onChange={setRange} tabs={[{ value: '30', label: '30 days' }, { value: '60', label: '60 days' }]} />}>
       <Row min={440}>
         <ChartPanel

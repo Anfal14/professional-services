@@ -1,6 +1,8 @@
 package com.profecian.assignment;
 
 import com.profecian.bookings.Booking;
+import com.profecian.bookings.ReleaseRules;
+import com.profecian.bookings.ReliabilityService;
 import com.profecian.settings.SettingsService;
 import com.profecian.sync.Api;
 import com.profecian.sync.ApiMapper;
@@ -14,13 +16,14 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * suggestVendors from mock.ts, computed in PostGIS. Lower score is better:
  * distance (km) + 4 × same-day workload − 2 × rating, +1000 if the vendor doesn't offer the
- * category, +500 if they are unavailable. Only approved vendors are considered.
+ * category, +500 if they are unavailable, +0.2 per point their completion rate is below 100%
+ * (ReleaseRules.reliabilityPenalty). Only approved vendors based in the booking's city are considered.
  */
 @Service
 public class VendorMatcher {
   private static final String SQL = """
       with target as (
-        select coalesce(b.address_location, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) as point, b.date, b.category_id
+        select coalesce(b.address_location, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) as point, b.date, b.category_id, b.address_city
         from bookings b where b.id = :bookingId
       ),
       ranked as (
@@ -32,7 +35,7 @@ public class VendorMatcher {
                v.available,
                v.rating
         from vendors v cross join target t
-        where v.status = 'approved'
+        where v.status = 'approved' and lower(v.city) = lower(t.address_city)
       )
       select id, km, workload, matches, available,
              km + workload * 4 - rating * 2 + case when matches then 0 else 1000 end + case when available then 0 else 500 end as score
@@ -44,8 +47,10 @@ public class VendorMatcher {
   private final VendorRepository vendors;
   private final SettingsService settings;
   private final ApiMapper mapper;
+  private final ReliabilityService reliability;
 
-  public VendorMatcher(NamedParameterJdbcTemplate jdbc, VendorRepository vendors, SettingsService settings, ApiMapper mapper) {
+  public VendorMatcher(NamedParameterJdbcTemplate jdbc, VendorRepository vendors, SettingsService settings, ApiMapper mapper, ReliabilityService reliability) {
+    this.reliability = reliability;
     this.jdbc = jdbc;
     this.vendors = vendors;
     this.settings = settings;
@@ -57,13 +62,18 @@ public class VendorMatcher {
   public List<Match> rank(Booking b) {
     // Bookings without coordinates fall back to a point near their city (jitterNear(city, booking.id)).
     double[] fallback = settings.jitterNear(b.addressCity, b.id);
-    return jdbc.query(SQL, Map.of("bookingId", b.id, "lat", fallback[0], "lng", fallback[1]), (rs, i) -> new Match(
-        rs.getString("id"),
-        Math.round(rs.getDouble("km") * 10) / 10.0,
-        rs.getInt("workload"),
-        rs.getBoolean("matches"),
-        rs.getBoolean("available"),
-        rs.getDouble("score")));
+    Map<String, ReliabilityService.Stats> stats = reliability.all();
+    return jdbc.query(SQL, Map.of("bookingId", b.id, "lat", fallback[0], "lng", fallback[1]), (rs, i) -> {
+      String id = rs.getString("id");
+      double penalty = ReleaseRules.reliabilityPenalty(stats.getOrDefault(id, ReliabilityService.Stats.NONE).rate());
+      return new Match(
+          id,
+          Math.round(rs.getDouble("km") * 10) / 10.0,
+          rs.getInt("workload"),
+          rs.getBoolean("matches"),
+          rs.getBoolean("available"),
+          rs.getDouble("score") + penalty);
+    }).stream().sorted(java.util.Comparator.comparingDouble(Match::score)).toList();
   }
 
   @Transactional(readOnly = true)

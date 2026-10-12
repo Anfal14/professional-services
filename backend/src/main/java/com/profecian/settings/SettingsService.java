@@ -49,7 +49,8 @@ public class SettingsService {
     return new double[] {lat + dy, lng + dx};
   }
 
-  public record Patch(BigDecimal taxRate, BigDecimal defaultCommissionRate, Integer defaultInspectionFee, List<String> cities, String whatsappNumber, String supportPhone) {}
+  /** Cities are managed separately (CityService). */
+  public record Patch(BigDecimal taxRate, BigDecimal defaultCommissionRate, Integer defaultInspectionFee, String whatsappNumber, String supportPhone) {}
 
   @Transactional
   public PlatformSettings update(Patch patch) {
@@ -68,17 +69,6 @@ public class SettingsService {
     }
     if (patch.whatsappNumber() != null) s.whatsappNumber = patch.whatsappNumber();
     if (patch.supportPhone() != null) s.supportPhone = patch.supportPhone();
-    if (patch.cities() != null) {
-      List<City> existing = cities.findAll();
-      int i = 0;
-      for (String name : patch.cities()) {
-        City c = existing.stream().filter(x -> x.name.equals(name)).findFirst().orElseGet(City::new);
-        c.name = name;
-        c.position = i++;
-        cities.save(c);
-      }
-      existing.stream().filter(c -> !patch.cities().contains(c.name)).forEach(cities::delete);
-    }
     s.updatedAt = Instant.now();
     live.notify("public", "all", null);
     return s;

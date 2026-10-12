@@ -44,7 +44,16 @@ public class VendorController {
 
   public record Quote(List<VendorJobService.QuoteLineInput> lines, String note) {}
 
-  public record Photo(String uri) {}
+  /** kind: "before" (default) or "after". */
+  public record Photo(String uri, String kind) {}
+
+  public record Advance(String startCode) {}
+
+  public record Cash(java.math.BigDecimal amount) {}
+
+  public record Release(String reason, String note) {}
+
+  public record Issue(String kind, String reason, String note) {}
 
   @PostMapping("/documents/{type}")
   public ResponseEntity<Void> uploadDocument(@PathVariable String type, @RequestBody Document d) {
@@ -72,19 +81,34 @@ public class VendorController {
     return ResponseEntity.noContent().build();
   }
 
+  /** Starting the service (arrived → in progress) needs the customer's start code in the body. */
   @PostMapping("/jobs/{id}/advance")
-  public Api.Booking advance(@PathVariable String id) {
-    return jobs.advance(CurrentUser.get(), id);
+  public Api.Booking advance(@PathVariable String id, @RequestBody(required = false) Advance a) {
+    return jobs.advance(CurrentUser.get(), id, a == null ? null : a.startCode());
   }
 
+  /** Takes back the professional's last step, within the undo window. */
+  @PostMapping("/jobs/{id}/undo")
+  public Api.Booking undo(@PathVariable String id) {
+    return jobs.undo(CurrentUser.get(), id);
+  }
+
+  /** The reason is optional. */
   @PostMapping("/jobs/{id}/decline")
-  public Api.Booking decline(@PathVariable String id, @RequestBody Reason r) {
-    return jobs.decline(CurrentUser.get(), id, r.reason());
+  public Api.Booking decline(@PathVariable String id, @RequestBody(required = false) Reason r) {
+    return jobs.decline(CurrentUser.get(), id, r == null ? null : r.reason());
   }
 
-  @PostMapping("/jobs/{id}/clarification")
-  public Api.Booking ask(@PathVariable String id, @RequestBody Text t) {
-    return jobs.askClarification(CurrentUser.get(), id, t.text());
+  /** "Can't make it" after accepting: back to the admin's queue (never a cancellation). */
+  @PostMapping("/jobs/{id}/release")
+  public Api.Booking release(@PathVariable String id, @RequestBody Release r) {
+    return jobs.release(CurrentUser.get(), id, r.reason(), r.note());
+  }
+
+  /** A problem on site ("customer not available", "can't do this job", "can't complete") for the admin to decide. */
+  @PostMapping("/jobs/{id}/issue")
+  public Api.Booking issue(@PathVariable String id, @RequestBody Issue i) {
+    return jobs.reportIssue(CurrentUser.get(), id, i.kind(), i.reason(), i.note());
   }
 
   @PostMapping("/jobs/{id}/quote")
@@ -99,12 +123,12 @@ public class VendorController {
 
   @PostMapping("/jobs/{id}/proof")
   public Api.Booking proof(@PathVariable String id, @RequestBody Photo p) {
-    return jobs.addProofPhoto(CurrentUser.get(), id, p.uri());
+    return jobs.addProofPhoto(CurrentUser.get(), id, p.uri(), p.kind());
   }
 
   @PostMapping("/jobs/{id}/collect-cash")
-  public Api.Booking collectCash(@PathVariable String id) {
-    return jobs.collectCash(CurrentUser.get(), id);
+  public Api.Booking collectCash(@PathVariable String id, @RequestBody(required = false) Cash c) {
+    return jobs.collectCash(CurrentUser.get(), id, c == null ? null : c.amount());
   }
 
   @GetMapping("/wallet")

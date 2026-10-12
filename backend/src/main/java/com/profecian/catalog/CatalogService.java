@@ -6,6 +6,8 @@ import com.profecian.catalog.CatalogRepositories.ProblemTypeRepository;
 import com.profecian.common.ApiException;
 import com.profecian.common.Ids;
 import com.profecian.live.LiveEvents;
+import com.profecian.settings.City;
+import com.profecian.settings.CityService;
 import com.profecian.sync.Api;
 import com.profecian.sync.ApiMapper;
 import java.math.BigDecimal;
@@ -19,13 +21,16 @@ public class CatalogService {
   private final CategoryRepository categories;
   private final ProblemTypeRepository problemTypes;
   private final BookingRepository bookings;
+  private final CityService cities;
   private final ApiMapper mapper;
   private final LiveEvents live;
 
-  public CatalogService(CategoryRepository categories, ProblemTypeRepository problemTypes, BookingRepository bookings, ApiMapper mapper, LiveEvents live) {
+  public CatalogService(CategoryRepository categories, ProblemTypeRepository problemTypes, BookingRepository bookings, CityService cities, ApiMapper mapper,
+                        LiveEvents live) {
     this.categories = categories;
     this.problemTypes = problemTypes;
     this.bookings = bookings;
+    this.cities = cities;
     this.mapper = mapper;
     this.live = live;
   }
@@ -63,6 +68,19 @@ public class CatalogService {
     categories.save(c);
     live.notify("public", "all", null);
     return mapper.category(c);
+  }
+
+  /** Sets the exact price of one problem in one city, or (null) goes back to the city's price level — setCityPrice in mock.ts. */
+  @Transactional
+  public Api.ProblemType setCityPrice(String problemTypeId, String cityName, BigDecimal price) {
+    ProblemType p = problemTypes.findById(problemTypeId).orElseThrow(() -> ApiException.notFound("Problem type not found"));
+    City city = cities.find(cityName).orElseThrow(() -> ApiException.notFound("City not found"));
+    if (price != null && (price.signum() < 0 || price.compareTo(BigDecimal.valueOf(1_000_000)) > 0)) throw ApiException.bad("Enter a valid price");
+    if (price == null) p.cityPrices.remove(city.name);
+    else p.cityPrices.put(city.name, price.setScale(2, java.math.RoundingMode.HALF_UP));
+    problemTypes.save(p);
+    live.notify("public", "all", null);
+    return mapper.problemType(p);
   }
 
   public record ProblemTypeInput(String id, String categoryId, String name, String description, String icon, BigDecimal price, String pricingModel,

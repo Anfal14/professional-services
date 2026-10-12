@@ -71,6 +71,9 @@ class BookingStatusTest {
     Inspection i = new Inspection();
     i.status = "pending";
     b.inspection = i;
+    // At the door is too early: the service has to be started first.
+    assertThat(BookingCore.canQuote(b)).isFalse();
+    b.status = "in_progress";
     assertThat(BookingCore.isQuoteOpen(b)).isTrue();
     assertThat(BookingCore.canQuote(b)).isTrue();
     i.status = "quoted";

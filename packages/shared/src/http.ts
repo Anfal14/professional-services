@@ -16,9 +16,12 @@ import {
   type Session,
   type Snapshot,
 } from './mock';
+import type { CityInput } from './cities';
+import type { ProofKind } from './job';
 import type { PaymentRequest } from './providers';
 import type {
-  Address, AdminUser, BookingStatus, Booking, Complaint, Customer, Database, ID, KycDocType, Payout, ProblemType, QuoteLine, Review,
+  Address, AdminUser, BookingStatus, Booking, CantCompleteReason, City, Complaint, Customer, Database, ID, JobIssueKind, KycDocType, Payout, PlatformSettings, ProblemType,
+  QuoteLine, ReleaseReason, Review,
   ServiceCategory, Vendor, WorkingHours,
 } from './types';
 
@@ -278,10 +281,6 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
       return act(() => request<Booking[]>('POST', '/api/v1/customer/checkout', { ...input, groups }));
     },
 
-    async answerClarification(_customerId: ID, bookingId: ID, answer: string) {
-      return act(() => request<Booking>('POST', `/api/v1/customer/bookings/${bookingId}/clarification`, { answer }));
-    },
-
     async respondToQuote(_customerId: ID, bookingId: ID, approve: boolean) {
       return act(() => request<Booking>('POST', `/api/v1/customer/bookings/${bookingId}/quote`, { approve }));
     },
@@ -361,12 +360,12 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
       await act(() => request('PATCH', '/api/v1/vendor/profile', { ...patch, photo }));
     },
 
-    async advanceJob(_vendorId: ID, bookingId: ID) {
-      return act(() => request<Booking>('POST', `/api/v1/vendor/jobs/${bookingId}/advance`));
+    async advanceJob(_vendorId: ID, bookingId: ID, opts: { startCode?: string } = {}) {
+      return act(() => request<Booking>('POST', `/api/v1/vendor/jobs/${bookingId}/advance`, { startCode: opts.startCode }));
     },
 
-    async askClarification(_vendorId: ID, bookingId: ID, question: string) {
-      return act(() => request<Booking>('POST', `/api/v1/vendor/jobs/${bookingId}/clarification`, { text: question }));
+    async undoStep(_vendorId: ID, bookingId: ID) {
+      return act(() => request<Booking>('POST', `/api/v1/vendor/jobs/${bookingId}/undo`));
     },
 
     async shareQuote(_vendorId: ID, bookingId: ID, lines: QuoteLine[], note?: string) {
@@ -377,17 +376,25 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
       return act(() => request<Booking>('POST', `/api/v1/vendor/jobs/${bookingId}/no-work`, { text: note }));
     },
 
-    async declineJob(_vendorId: ID, bookingId: ID, reason: string) {
+    async declineJob(_vendorId: ID, bookingId: ID, reason?: string) {
       return act(() => request<Booking>('POST', `/api/v1/vendor/jobs/${bookingId}/decline`, { reason }));
     },
 
-    async addProofPhoto(_vendorId: ID, bookingId: ID, uri: string) {
-      const key = await upload(uri);
-      return act(() => request<Booking>('POST', `/api/v1/vendor/jobs/${bookingId}/proof`, { uri: key }));
+    async releaseJob(_vendorId: ID, bookingId: ID, input: { reason: ReleaseReason; note?: string }) {
+      return act(() => request<Booking>('POST', `/api/v1/vendor/jobs/${bookingId}/release`, input));
     },
 
-    async collectCash(_vendorId: ID, bookingId: ID) {
-      return act(() => request<Booking>('POST', `/api/v1/vendor/jobs/${bookingId}/collect-cash`));
+    async reportIssue(_vendorId: ID, bookingId: ID, input: { kind: JobIssueKind; reason?: CantCompleteReason; note?: string }) {
+      return act(() => request<Booking>('POST', `/api/v1/vendor/jobs/${bookingId}/issue`, input));
+    },
+
+    async addProofPhoto(_vendorId: ID, bookingId: ID, uri: string, kind: ProofKind = 'before') {
+      const key = await upload(uri);
+      return act(() => request<Booking>('POST', `/api/v1/vendor/jobs/${bookingId}/proof`, { uri: key, kind }));
+    },
+
+    async collectCash(_vendorId: ID, bookingId: ID, amountReceived: number) {
+      return act(() => request<Booking>('POST', `/api/v1/vendor/jobs/${bookingId}/collect-cash`, { amount: amountReceived }));
     },
 
     async requestPayout(_vendorId: ID) {
@@ -430,12 +437,12 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
       return act(() => request<ProblemType>('PUT', '/api/v1/admin/problem-types', input));
     },
 
-    async deleteProblemType(id: ID) {
-      await act(() => request('DELETE', `/api/v1/admin/problem-types/${id}`));
+    async setCityPrice(problemTypeId: ID, cityName: string, price: number | null) {
+      return act(() => request<ProblemType>('PUT', `/api/v1/admin/problem-types/${problemTypeId}/city-prices/${encodeURIComponent(cityName)}`, { price }));
     },
 
-    async askCustomer(bookingId: ID, question: string) {
-      return act(() => request<Booking>('POST', `/api/v1/admin/bookings/${bookingId}/ask`, { question }));
+    async deleteProblemType(id: ID) {
+      await act(() => request('DELETE', `/api/v1/admin/problem-types/${id}`));
     },
 
     async respondToQuote(bookingId: ID, approve: boolean, note: string) {
@@ -444,6 +451,14 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
 
     async assignVendor(bookingId: ID, vendorId: ID) {
       return act(() => request<Booking>('POST', `/api/v1/admin/bookings/${bookingId}/assign`, { vendorId }));
+    },
+
+    async resolveIssue(bookingId: ID, note: string) {
+      return act(() => request<Booking>('POST', `/api/v1/admin/bookings/${bookingId}/issue/resolve`, { note }));
+    },
+
+    async scheduleReturnVisit(bookingId: ID, date: string, slot: string) {
+      return act(() => request<Booking>('POST', `/api/v1/admin/bookings/${bookingId}/return-visit`, { date, slot }));
     },
 
     async setBookingStatus(bookingId: ID, status: BookingStatus, note?: string) {
@@ -466,8 +481,18 @@ export function createHttpBackend(options: HttpBackendOptions): Backend {
       await act(() => request('PATCH', `/api/v1/admin/complaints/${id}`, { status, resolution }));
     },
 
-    async updateSettings(patch: Partial<Database['settings']>) {
+    async updateSettings(patch: Partial<Omit<PlatformSettings, 'cities'>>) {
       await act(() => request('PATCH', '/api/v1/admin/settings', patch));
+    },
+
+    async saveCity(input: CityInput, editing?: string) {
+      return act(() => (editing
+        ? request<City>('PUT', `/api/v1/admin/cities/${encodeURIComponent(editing)}`, input)
+        : request<City>('POST', '/api/v1/admin/cities', input)));
+    },
+
+    async deleteCity(name: string) {
+      await act(() => request('DELETE', `/api/v1/admin/cities/${encodeURIComponent(name)}`));
     },
 
     async sendTodayReminders() {

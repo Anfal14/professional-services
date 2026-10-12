@@ -7,3 +7,4 @@ export * from './confirm';
 export * from './ThemeProvider';
 export * from './Calendar';
 export * from './Inspection';
+export * from './SlideToConfirm';

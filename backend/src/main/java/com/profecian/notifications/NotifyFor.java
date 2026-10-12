@@ -4,6 +4,7 @@ import static com.profecian.common.Formats.date;
 import static com.profecian.common.Formats.inr;
 
 import com.profecian.bookings.Booking;
+import com.profecian.bookings.ReleaseRules;
 import com.profecian.bookings.BookingLabels;
 import com.profecian.vendors.Vendor;
 import java.math.BigDecimal;
@@ -70,6 +71,12 @@ public class NotifyFor {
         v.name + " is heading to your address for booking " + b.code + ".", WA_PUSH).whatsapp(b.customerPhone));
   }
 
+  /** Tells the customer the start code to read out at the door. */
+  public List<Draft> vendorArrived(Booking b, Vendor v) {
+    return List.of(Draft.of("customer", b.customerId, "vendor_arrived", b.id, "Your professional has arrived",
+        v.name + " is at your address. Start code " + b.startCode + " — share it only when they are at your door.", WA_PUSH).whatsapp(b.customerPhone));
+  }
+
   public List<Draft> serviceCompleted(Booking b) {
     return List.of(Draft.of("customer", b.customerId, "service_completed", b.id, "Service completed",
         "Your " + labels.service(b) + " job " + b.code + " is done. Amount due " + inr(b.total) + ". Please rate your professional.", WA_PUSH)
@@ -108,6 +115,23 @@ public class NotifyFor {
     return out;
   }
 
+  /** A professional gave the job back: the admin must reassign, and the customer is told straight away. */
+  public List<Draft> jobReleased(Booking b, Booking.Release r) {
+    return List.of(
+        Draft.of("admin", "admin", "job_released", b.id, r.late ? "Urgent: job released close to the slot" : "Job released",
+            b.code + " · " + labels.service(b) + " in " + b.addressCity + ", " + date(b.date) + " " + b.slot + " — " + r.vendorName
+                + " can’t make it (" + ReleaseRules.REASON_LABEL.get(r.reason) + "). Needs a new professional.", IN_APP),
+        Draft.of("customer", b.customerId, "professional_released", b.id, "Finding another professional",
+            "Your professional can’t make it for booking " + b.code + ". We’re assigning another one — your slot on " + date(b.date) + ", " + b.slot
+                + " stays the same.", WA_PUSH).whatsapp(b.customerPhone));
+  }
+
+  /** A professional reported a problem on site: the admin decides. */
+  public List<Draft> issueReported(Booking b) {
+    return List.of(Draft.of("admin", "admin", "job_issue", b.id, ReleaseRules.ISSUE_LABEL.get(b.issueKind) + " — " + b.code,
+        ReleaseRules.issueNote(b) + ". Decide what happens next.", IN_APP));
+  }
+
   public List<Draft> jobReminder(Booking b) {
     if (b.vendorId == null) return List.of();
     return List.of(Draft.of("vendor", b.vendorId, "job_reminder", b.id, "Upcoming job reminder",
@@ -124,34 +148,28 @@ public class NotifyFor {
         v.name + " (" + v.city + ") submitted KYC documents for review.", IN_APP));
   }
 
-  public List<Draft> clarificationRequested(Booking b, String askedBy, String question) {
-    return List.of(Draft.of("customer", b.customerId, "clarification_requested", b.id, "Question about your booking",
-        askedBy + " asks: “" + question + "” — reply in the app (" + b.code + ").", WA_PUSH).whatsapp(b.customerPhone));
-  }
-
-  public List<Draft> clarificationAnswered(Booking b, String answer) {
-    List<Draft> out = new ArrayList<>();
-    out.add(Draft.of("admin", "admin", "clarification_answered", b.id, "Customer replied", b.code + ": “" + answer + "”", IN_APP));
-    if (b.vendorId != null) out.add(Draft.of("vendor", b.vendorId, "clarification_answered", b.id, "Customer replied", b.code + ": “" + answer + "”", PUSH));
-    return out;
-  }
-
   public List<Draft> quoteShared(Booking b) {
     BigDecimal amount = b.inspection != null && b.inspection.quoteAmount != null ? b.inspection.quoteAmount : BigDecimal.ZERO;
+    boolean extra = b.inspection != null && b.inspection.isExtraWork();
     return List.of(
-        Draft.of("customer", b.customerId, "quote_shared", b.id, "Repair quote ready",
-            labels.service(b) + " (" + b.code + "): " + inr(amount) + " + GST. Approve or decline in the app before any work starts.", WA_PUSH)
+        Draft.of("customer", b.customerId, "quote_shared", b.id, extra ? "Quote for extra work" : "Repair quote ready",
+            extra
+                ? labels.service(b) + " (" + b.code + "): your professional found more work — " + inr(amount) + " + GST on top of your booking. Approve or decline in the app."
+                : labels.service(b) + " (" + b.code + "): " + inr(amount) + " + GST. Approve or decline in the app before any work starts.", WA_PUSH)
             .whatsapp(b.customerPhone),
-        Draft.of("admin", "admin", "quote_shared", b.id, "Quote shared", b.code + ": " + inr(amount) + " + GST, awaiting customer.", IN_APP));
+        Draft.of("admin", "admin", "quote_shared", b.id, extra ? "Extra-work quote shared" : "Quote shared", b.code + ": " + inr(amount) + " + GST, awaiting customer.", IN_APP));
   }
 
   public List<Draft> quoteResponse(Booking b, boolean approved) {
     String verdict = approved ? "approved" : "declined";
+    boolean extra = b.inspection != null && b.inspection.isExtraWork();
     List<Draft> out = new ArrayList<>();
-    out.add(Draft.of("admin", "admin", "quote_response", b.id, "Quote " + verdict, b.code + ": customer " + verdict + " the repair quote.", IN_APP));
+    out.add(Draft.of("admin", "admin", "quote_response", b.id, "Quote " + verdict, b.code + ": customer " + verdict + " the " + (extra ? "extra-work" : "repair") + " quote.", IN_APP));
     if (b.vendorId != null) {
       out.add(Draft.of("vendor", b.vendorId, "quote_response", b.id, "Quote " + verdict,
-          approved ? b.code + ": go ahead with the repair." : b.code + ": complete the visit for the inspection fee, or share a revised quote.", PUSH));
+          extra
+              ? approved ? b.code + ": go ahead with the extra work too." : b.code + ": complete the booked work only, or share a revised quote."
+              : approved ? b.code + ": go ahead with the repair." : b.code + ": complete the visit for the inspection fee, or share a revised quote.", PUSH));
     }
     return out;
   }

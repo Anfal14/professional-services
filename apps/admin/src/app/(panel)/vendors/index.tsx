@@ -1,15 +1,17 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { formatPhone, timeAgo, VENDOR_STATUS, type VendorStatus } from '@profecian/shared';
-import { AppText, Badge, spacing } from '@profecian/ui';
+import { formatPhone, RELIABILITY_LOW, reliabilityLabel, reliabilityOf, timeAgo, VENDOR_STATUS, type VendorStatus } from '@profecian/shared';
+import { AppText, Badge, colors, spacing } from '@profecian/ui';
 import { Cell, DataTable, Page, SearchInput, Tabs } from '@/components/admin';
-import { useLookups } from '@/components/lookups';
+import { useScopedLookups } from '@/components/lookups';
 
 type Filter = 'all' | VendorStatus;
 
 export default function Vendors() {
-  const { db, category } = useLookups();
+  const { db, allDb, category, city } = useScopedLookups();
+  // Counted over every city's bookings, whatever the city filter.
+  const reliability = (v: (typeof db.vendors)[number]) => reliabilityOf(allDb, v);
   const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
   const rows = useMemo(() => {
@@ -21,7 +23,7 @@ export default function Vendors() {
   const count = (s: Filter) => (s === 'all' ? db.vendors.length : db.vendors.filter((v) => v.status === s).length);
 
   return (
-    <Page title="Vendors" subtitle="Approve applications, verify KYC and track performance." permission="vendors">
+    <Page title="Vendors" subtitle={city ? `Professionals based in ${city}.` : 'Approve applications, verify KYC and track performance.'} permission="vendors" cityFilter>
       <View style={{ gap: spacing.md }}>
         <SearchInput value={q} onChange={setQ} placeholder="Search name, phone, city or service" />
         <Tabs
@@ -41,6 +43,16 @@ export default function Vendors() {
           { key: 'kyc', title: 'KYC', min: 110, render: (v) => {
             const verified = v.kyc.filter((k) => k.status === 'verified').length;
             return <Badge label={`${verified}/${v.kyc.length} verified`} tone={verified === v.kyc.length ? 'success' : v.kyc.some((k) => k.status === 'rejected') ? 'danger' : 'warning'} />;
+          } },
+          { key: 'rate', title: 'Completion', min: 120, sort: (v) => reliability(v).rate ?? 101, render: (v) => {
+            const r = reliability(v);
+            const low = r.rate != null && r.rate < RELIABILITY_LOW;
+            return (
+              <View style={{ gap: 1 }}>
+                <AppText variant="label" color={low ? colors.danger : r.rate == null ? colors.muted : colors.ink}>{reliabilityLabel(r)}</AppText>
+                <AppText variant="small">{r.lateReleases ? `${r.lateReleases} late of ${r.accepted}` : `${r.accepted} accepted`}</AppText>
+              </View>
+            );
           } },
           { key: 'perf', title: 'Performance', min: 140, sort: (v) => v.jobsCompleted, render: (v) => <Cell title={v.rating ? `★ ${v.rating} (${v.ratingCount})` : 'No ratings'} sub={`${v.jobsCompleted} jobs done`} /> },
           { key: 'status', title: 'Status', min: 150, sort: (v) => v.status, render: (v) => (

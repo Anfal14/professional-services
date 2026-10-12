@@ -1,7 +1,7 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { formatPhone, useAction, useBackend, useDb } from '@profecian/shared';
+import { formatPhone, liveCities, useAction, useBackend, useDb } from '@profecian/shared';
 import { Banner, ChipGroup, FieldShell } from '@profecian/ui';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
@@ -47,7 +47,7 @@ export default function ProfileSetup() {
         <TextField label="Full Name" required icon="person-outline" placeholder="e.g. Priya Sharma" value={name} onChangeText={setName} autoCapitalize="words" autoComplete="name" />
         <TextField label="Email" optional icon="mail-outline" placeholder="you@example.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
         <FieldShell label="City" required hint="We'll show professionals and prices for your city.">
-          <ChipGroup value={city} onChange={setCity} options={db.settings.cities.map((c) => ({ value: c, label: c }))} />
+          <ChipGroup value={city} onChange={setCity} options={liveCities(db.settings).map((c) => ({ value: c.name, label: c.name }))} />
         </FieldShell>
         <Button label="Create account" icon="checkmark-circle" size="lg" fullWidth loading={create.pending} onPress={submit} />
       </Container>

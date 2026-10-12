@@ -1,15 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { formatPhone, useAction, useBackend, useDb } from '@profecian/shared';
+import { CITY_STATUS_LABEL, findCity, formatPhone, useAction, useBackend, useDb, vendorCities } from '@profecian/shared';
 import { AppText, asIcon, Banner, Button, ChipGroup, FieldShell, spacing, TextField } from '@profecian/ui';
 import { VendorScreen } from '@/components/VendorScreen';
-
-const AREAS: Record<string, string[]> = {
-  Solapur: ['Sadar Bazar', 'Hotgi Road', 'Vijapur Naka', 'Akkalkot Road', 'Jule Solapur'],
-  Pune: ['Kothrud', 'Hinjewadi', 'Viman Nagar', 'Hadapsar', 'Baner'],
-  Mumbai: ['Andheri', 'Bandra', 'Powai', 'Thane', 'Dadar'],
-};
 
 export default function Register() {
   const { phone = '' } = useLocalSearchParams<{ phone: string }>();
@@ -17,7 +11,10 @@ export default function Register() {
   const backend = useBackend();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [city, setCity] = useState('Solapur');
+  // Live cities, plus coming-soon ones that are already signing up partners.
+  const cities = vendorCities(db.settings);
+  const [city, setCity] = useState(cities[0]?.name ?? '');
+  const cityAreas = findCity(db.settings, city)?.areas ?? [];
   const [cats, setCats] = useState<string[]>([]);
   const [areas, setAreas] = useState<string[]>([]);
   const register = useAction(backend.vendor.register);
@@ -25,6 +22,7 @@ export default function Register() {
 
   const submit = async () => {
     if (name.trim().length < 2) return register.setError('Enter your full name as on Aadhaar');
+    if (!city) return register.setError('Choose the city you work in');
     if (!cats.length) return register.setError('Select at least one service you offer');
     const v = await register.run({ phone, name, email, city, categoryIds: cats, serviceAreas: areas.length ? areas : [city] });
     if (v) router.replace('/onboarding');
@@ -36,13 +34,16 @@ export default function Register() {
       <TextField label="Full name" required placeholder="As on your Aadhaar card" value={name} onChangeText={setName} autoCapitalize="words" autoComplete="name" />
       <TextField label="Email" optional placeholder="you@example.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
       <FieldShell label="City" required>
-        <ChipGroup value={city} onChange={(c) => { setCity(c); setAreas([]); }} options={db.settings.cities.map((c) => ({ value: c, label: c }))} />
+        <ChipGroup value={city} onChange={(c) => { setCity(c); setAreas([]); }} options={cities.map((c) => ({ value: c.name, label: c.status === 'live' ? c.name : `${c.name} · ${CITY_STATUS_LABEL[c.status]}` }))} />
       </FieldShell>
+      {findCity(db.settings, city)?.status === 'coming_soon' ? (
+        <Banner tone="info" icon="rocket-outline" title={`We’re launching in ${city} soon`} message="Sign up and get verified now — you’ll start receiving jobs as soon as bookings open." />
+      ) : null}
       <FieldShell label="Services you offer" required hint="You'll only receive jobs for these categories.">
         <ChipGroup multi value={cats} onChange={(c) => setCats((l) => toggle(l, c))} options={db.categories.filter((c) => c.enabled).map((c) => ({ value: c.id, label: c.name, icon: asIcon(c.icon) }))} />
       </FieldShell>
       <FieldShell label="Service areas" optional hint="Localities you're willing to travel to.">
-        <ChipGroup multi value={areas} onChange={(a) => setAreas((l) => toggle(l, a))} options={(AREAS[city] ?? [city]).map((a) => ({ value: a, label: a }))} />
+        <ChipGroup multi value={areas} onChange={(a) => setAreas((l) => toggle(l, a))} options={(cityAreas.length ? cityAreas : [city]).map((a) => ({ value: a, label: a }))} />
       </FieldShell>
       <View style={{ gap: 4 }}>
         <AppText variant="label">Next: verify your identity</AppText>

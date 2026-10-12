@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { suggestVendors, useAction, useBackend, useDb, type Booking } from '@profecian/shared';
+import { RELIABILITY_LOW, reliabilityLabel, reliabilityOf, suggestVendors, useAction, useBackend, useDb, type Booking } from '@profecian/shared';
 import { AppText, Avatar, Badge, Banner, Button, ChipGroup, colors, spacing, Stars } from '@profecian/ui';
 
 type Filter = 'match' | 'available' | 'all';
 
 /**
- * Ranked vendor suggestions for a booking: nearest first, penalising
- * workload on the booking date, unavailable vendors and non-matching services.
+ * Ranked vendor suggestions for a booking, from approved vendors in the booking's city: nearest
+ * first, penalising workload on the booking date, unavailable vendors and non-matching services.
  */
 export function VendorPicker({ booking, onDone, limit = 6 }: { booking: Booking; onDone?: () => void; limit?: number }) {
   const db = useDb();
@@ -26,11 +26,15 @@ export function VendorPicker({ booking, onDone, limit = 6 }: { booking: Booking;
         options={[
           { value: 'match', label: `Offers ${category?.name ?? 'service'}` },
           { value: 'available', label: 'Available now' },
-          { value: 'all', label: 'All approved' },
+          { value: 'all', label: `All in ${booking.address.city}` },
         ]}
       />
       {assign.error ? <Banner tone="danger" icon="alert-circle" title={assign.error} /> : null}
-      {list.length === 0 ? <AppText variant="small">No approved vendors match this filter in range.</AppText> : null}
+      {list.length === 0 ? (
+        <AppText variant="small">
+          {all.length ? 'No approved professionals match this filter.' : `No approved professionals in ${booking.address.city} yet — approve or recruit vendors there first.`}
+        </AppText>
+      ) : null}
       {list.map((s, i) => {
         const current = booking.vendorId === s.vendor.id;
         return (
@@ -46,6 +50,12 @@ export function VendorPicker({ booking, onDone, limit = 6 }: { booking: Booking;
                 <AppText variant="small">{s.distanceKm} km</AppText>
                 <AppText variant="small">· {s.workload} job{s.workload === 1 ? '' : 's'} that day</AppText>
                 {s.vendor.ratingCount ? <Stars value={s.vendor.rating} size={11} count={s.vendor.ratingCount} /> : <AppText variant="small">· New</AppText>}
+                {(() => {
+                  // The completion rate feeds the ranking: a lower rate ranks lower.
+                  const r = reliabilityOf(db, s.vendor);
+                  const low = r.rate != null && r.rate < RELIABILITY_LOW;
+                  return <AppText variant="small" color={low ? colors.danger : undefined}>· {r.rate == null ? 'New' : `${reliabilityLabel(r)} completion`}</AppText>;
+                })()}
                 {!s.available ? <Badge label="Offline" tone="neutral" /> : null}
                 {!s.matchesService ? <Badge label="Different service" tone="warning" /> : null}
               </View>

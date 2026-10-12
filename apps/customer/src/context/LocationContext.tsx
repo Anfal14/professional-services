@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Address } from '@profecian/shared';
+import { bookingBlockedReason, findCity, liveCities, useDb, type Address, type City } from '@profecian/shared';
 import { useCustomer } from '@/backend';
 import * as api from '@/services/locationApi';
 import type { CurrentLocation, LocationSelection } from '@/services/locationApi';
@@ -8,6 +8,16 @@ interface LocationContextValue {
   selection: LocationSelection;
   /** City the customer is booking in (from the address, detected location or picked city). */
   city: string;
+  /** That city's details, when the platform knows it. */
+  cityInfo?: City;
+  /** Why bookings can't be placed in that city (coming soon, paused, not served) — null when they can. */
+  blockedReason: string | null;
+  /** Same, for booking a particular service here (also covers services this city doesn't offer). */
+  blockedFor: (category: { id: string; name: string }) => string | null;
+  /** Cities open for booking, in display order. */
+  liveCities: City[];
+  /** Cities announced but not open yet. */
+  comingSoonCities: City[];
   /** The chosen saved address, if the selection is one. */
   selectedAddress?: Address;
   /** Top-bar line 1, e.g. "Home", "Current location" or "Solapur". */
@@ -29,6 +39,7 @@ export function formatFullAddress(a: Pick<Address, 'line' | 'landmark' | 'city' 
 
 export function LocationProvider({ children }: { children: ReactNode }) {
   const customer = useCustomer();
+  const { settings } = useDb();
   const [selection, setSelection] = useState<LocationSelection>(api.DEFAULT_SELECTION);
   const [loading, setLoading] = useState(true);
 
@@ -54,7 +65,13 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   const value = useMemo<LocationContextValue>(() => {
     // A saved address that no longer exists (deleted, or signed out) falls back to its city.
     const selectedAddress = selection.kind === 'saved' ? addresses.find((a) => a.id === selection.addressId) : undefined;
-    let title: string = selection.city;
+    const live = liveCities(settings);
+    // A picked city the platform no longer has (removed) falls back to the first live one.
+    const pickedCity = selection.kind === 'city' && settings.cities.length && !findCity(settings, selection.city)
+      ? live[0]?.name ?? selection.city
+      : selection.city;
+    const city = selectedAddress?.city ?? pickedCity;
+    let title: string = pickedCity;
     let subtitle = 'Set your exact address for faster booking';
     if (selectedAddress) {
       title = selectedAddress.label;
@@ -65,17 +82,23 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     }
     return {
       selection,
-      city: selectedAddress?.city ?? selection.city,
+      city,
+      cityInfo: findCity(settings, city),
+      // Until the city list has loaded, don't warn; the backend checks again when booking.
+      blockedReason: settings.cities.length ? bookingBlockedReason(settings, city) : null,
+      blockedFor: (category) => (settings.cities.length ? bookingBlockedReason(settings, city, category) : null),
+      liveCities: live,
+      comingSoonCities: settings.cities.filter((c) => c.status === 'coming_soon'),
       selectedAddress,
       title,
       subtitle,
       addresses,
       loading,
-      selectCity: (city) => choose({ kind: 'city', city }),
+      selectCity: (name) => choose({ kind: 'city', city: name }),
       selectAddress: (a) => choose({ kind: 'saved', addressId: a.id, city: a.city }),
       selectCurrent: (current) => choose(current),
     };
-  }, [selection, addresses, loading, choose]);
+  }, [selection, addresses, loading, choose, settings]);
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;
 }
