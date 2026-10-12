@@ -57,5 +57,9 @@ public class OutboxMessage {
     List<OutboxMessage> claimDue(int limit);
 
     long countByStatus(String status);
+
+    /** Pending rows that are due now — messages held back for an undo window are not. */
+    @Query(value = "select count(*) from outbox where status = 'pending' and next_attempt_at <= now()", nativeQuery = true)
+    long countDue();
   }
 }

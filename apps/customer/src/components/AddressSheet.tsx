@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View } from 'react-native';
-import { useAction, useBackend, useDb, type Address } from '@profecian/shared';
+import { liveCities, useAction, useBackend, useDb, type Address } from '@profecian/shared';
 import { Banner, Button, ChipGroup, FieldShell, Sheet, TextField } from '@profecian/ui';
 import { useCustomer } from '@/backend';
 import { useLocation } from '@/context/LocationContext';
@@ -44,11 +44,12 @@ function AddressForm({ address, prefill, onDone }: { address?: Address; prefill?
   const customer = useCustomer();
   const backend = useBackend();
   const db = useDb();
-  const { city: selectedCity, selectAddress } = useLocation();
+  const { city: selectedCity, blockedReason, selectAddress } = useLocation();
   const [label, setLabel] = useState<Label>(address?.label ?? 'Home');
   const [line, setLine] = useState(address?.line ?? (prefill && !prefill.area.startsWith('Pinned') ? prefill.area : ''));
   const [landmark, setLandmark] = useState(address?.landmark ?? '');
-  const [city, setCity] = useState(address?.city ?? prefill?.city ?? selectedCity);
+  // New addresses start in the city being browsed, if it takes bookings.
+  const [city, setCity] = useState(address?.city ?? prefill?.city ?? (blockedReason ? liveCities(db.settings)[0]?.name ?? selectedCity : selectedCity));
   const [pincode, setPincode] = useState(address?.pincode ?? '');
   const [touched, setTouched] = useState(false);
   const save = useAction(backend.customer.saveAddress);
@@ -96,7 +97,7 @@ function AddressForm({ address, prefill, onDone }: { address?: Address; prefill?
       />
       <TextField label="Landmark" optional icon="flag-outline" placeholder="e.g. Opposite City Mall" value={landmark} onChangeText={setLandmark} maxLength={80} />
       <FieldShell label="City" required>
-        <ChipGroup value={city} onChange={setCity} options={db.settings.cities.map((c) => ({ value: c, label: c }))} />
+        <ChipGroup value={city} onChange={setCity} options={liveCities(db.settings).map((c) => ({ value: c.name, label: c.name }))} />
       </FieldShell>
       <TextField
         label="PIN code"

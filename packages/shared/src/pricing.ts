@@ -1,4 +1,4 @@
-import { INSPECTION_LABEL } from './inspection';
+import { EXTRA_WORK_LABEL, INSPECTION_LABEL } from './inspection';
 import type { Booking, Database, PriceBreakdown, ProblemType, ServiceCategory, PlatformSettings } from './types';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -40,7 +40,7 @@ export function bookingProblemNames(db: Pick<Database, 'problemTypes'>, b: Pick<
     const p = db.problemTypes.find((x) => x.id === b.problemTypeId);
     if (p) names.push(p.name);
   }
-  if (b.inspection) names.push(INSPECTION_LABEL);
+  if (b.inspection) names.push(b.inspection.kind === 'extra_work' ? EXTRA_WORK_LABEL : INSPECTION_LABEL);
   return names;
 }
 

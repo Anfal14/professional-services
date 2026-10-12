@@ -18,8 +18,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * "Other / Not sure" request — InspectionRequest in types.ts. The booking keeps its
- * category; the professional inspects, then quotes.
+ * A booking's quote thread — InspectionRequest in types.ts. Either an "Other / Not sure" request
+ * (the booking keeps its category; the professional inspects, then quotes) or a quote for extra
+ * work the professional found on a normal booking.
  * Status: pending → quoted → approved | declined, or no_work_needed.
  */
 @Entity
@@ -34,12 +35,12 @@ public class Inspection {
   @JoinColumn(name = "booking_id")
   public Booking booking;
 
+  /** not_sure (customer chose "Other / Not sure") | extra_work (professional quoted more work on a normal booking). */
+  public String kind = "not_sure";
+
   public String description;
   public int fee;
   public String status = "pending";
-
-  @Column(name = "awaiting_customer")
-  public boolean awaitingCustomer;
 
   @Column(name = "no_work_note")
   public String noWorkNote;
@@ -68,11 +69,6 @@ public class Inspection {
   @OrderColumn(name = "position")
   public List<QuoteLine> quoteLines = new ArrayList<>();
 
-  @ElementCollection(fetch = FetchType.LAZY)
-  @CollectionTable(name = "inspection_messages", joinColumns = @JoinColumn(name = "booking_id"))
-  @OrderColumn(name = "position")
-  public List<Message> messages = new ArrayList<>();
-
   public boolean hasQuote() {
     return quoteAmount != null;
   }
@@ -100,24 +96,7 @@ public class Inspection {
     }
   }
 
-  @Embeddable
-  public static class Message {
-    public String id;
-    @Column(name = "from_role")
-    public String fromRole;
-    @Column(name = "author_name")
-    public String authorName;
-    public String text;
-    public Instant at;
-
-    public Message() {}
-
-    public Message(String id, String fromRole, String authorName, String text, Instant at) {
-      this.id = id;
-      this.fromRole = fromRole;
-      this.authorName = authorName;
-      this.text = text;
-      this.at = at;
-    }
+  public boolean isExtraWork() {
+    return "extra_work".equals(kind);
   }
 }

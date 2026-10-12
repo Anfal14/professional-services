@@ -91,6 +91,12 @@ spring:
       on-profile: dev
   flyway:
     locations: classpath:db/migration,classpath:db/dev
+    # Dev data (V1000+) sits above the schema migrations, so a dev database that already has it
+    # must still apply schema migrations added later (V2, V3, …).
+    out-of-order: true
+    # The dev seed (V1000) is generated and gets edited when the schema drops something it used,
+    # so its checksum is not checked here. Production loads db/migration only and always validates.
+    validate-on-migrate: false
 
 ---
 spring:

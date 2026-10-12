@@ -5,13 +5,18 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 export interface CartItem {
   serviceId: string;
   issueId: string;
+  /** City whose prices the customer was shown when adding this — the cart says so if the booking city differs. */
+  city?: string;
 }
 
 interface CartContextValue {
   items: CartItem[];
   count: number;
   has: (serviceId: string, issueId: string) => boolean;
-  toggle: (serviceId: string, issueId: string) => void;
+  /** `city`: the city whose prices are on screen. */
+  toggle: (serviceId: string, issueId: string, city?: string) => void;
+  /** The customer has seen the prices for `city`; remember that for every item. */
+  acceptPrices: (city: string) => void;
   remove: (serviceId: string, issueId: string) => void;
   /** Empty the cart, or just one service's items. */
   clear: (serviceId?: string) => void;
@@ -32,7 +37,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       .then((raw) => {
         const parsed: unknown = raw ? JSON.parse(raw) : [];
         if (active && Array.isArray(parsed)) {
-          setItems(parsed.filter((i): i is CartItem => typeof i?.serviceId === 'string' && typeof i?.issueId === 'string'));
+          setItems(parsed
+            .filter((i): i is CartItem => typeof i?.serviceId === 'string' && typeof i?.issueId === 'string')
+            .map((i) => ({ serviceId: i.serviceId, issueId: i.issueId, ...(typeof i.city === 'string' ? { city: i.city } : {}) })));
         }
       })
       .catch(() => undefined);
@@ -54,8 +61,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       items,
       count: items.length,
       has: (serviceId, issueId) => items.some((i) => same(i, serviceId, issueId)),
-      toggle: (serviceId, issueId) =>
-        update((prev) => (prev.some((i) => same(i, serviceId, issueId)) ? prev.filter((i) => !same(i, serviceId, issueId)) : [...prev, { serviceId, issueId }])),
+      toggle: (serviceId, issueId, city) =>
+        update((prev) => (prev.some((i) => same(i, serviceId, issueId)) ? prev.filter((i) => !same(i, serviceId, issueId)) : [...prev, { serviceId, issueId, ...(city ? { city } : {}) }])),
+      acceptPrices: (city) => update((prev) => prev.map((i) => ({ ...i, city }))),
       remove: (serviceId, issueId) => update((prev) => prev.filter((i) => !same(i, serviceId, issueId))),
       clear: (serviceId) => update((prev) => (serviceId ? prev.filter((i) => i.serviceId !== serviceId) : [])),
     }),

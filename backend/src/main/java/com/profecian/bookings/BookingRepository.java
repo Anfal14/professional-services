@@ -9,8 +9,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface BookingRepository extends JpaRepository<Booking, String> {
   List<Booking> findByCustomerIdOrderByCreatedAtDesc(String customerId);
@@ -22,6 +25,15 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
   List<Booking> findByVendorIdAndStatus(String vendorId, String status);
 
   List<Booking> findByDateAndStatusIn(LocalDate date, Collection<String> statuses);
+
+  /** Another job of this professional in the given status (the "one job in progress" rule). */
+  Optional<Booking> findFirstByVendorIdAndStatusAndIdNot(String vendorId, String status, String id);
+
+  /** Counts a wrong start code in its own transaction, so it is kept even though the request fails. */
+  @Modifying
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  @Query("update Booking b set b.startCodeAttempts = b.startCodeAttempts + 1 where b.id = :id")
+  int recordWrongStartCode(@Param("id") String id);
 
   boolean existsByProblemTypeId(String problemTypeId);
 

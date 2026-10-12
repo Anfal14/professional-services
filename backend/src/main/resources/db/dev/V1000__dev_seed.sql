@@ -1125,9 +1125,7 @@ INSERT INTO booking_events (booking_id, position, kind, at, by_role, note) VALUE
   ('bkg_99', 3, 'on_the_way', now() - interval '440371 seconds', 'vendor', NULL),
   ('bkg_99', 4, 'arrived', now() - interval '437567 seconds', 'vendor', NULL),
   ('bkg_99', 5, 'in_progress', now() - interval '434934 seconds', 'vendor', NULL),
-  ('bkg_99', 6, 'clarification_requested', now() - interval '72000 seconds', 'vendor', 'Does the fan hum when switched on, or is it completely silent?'),
-  ('bkg_99', 7, 'clarification_answered', now() - interval '68400 seconds', 'customer', 'It hums but does not spin.'),
-  ('bkg_99', 8, 'quote_shared', now() - interval '1800 seconds', 'vendor', '2 items, ₹600 + GST'),
+  ('bkg_99', 6, 'quote_shared', now() - interval '1800 seconds', 'vendor', '2 items, ₹600 + GST'),
   ('bkg_94', 0, 'pending_assignment', now() - interval '452024 seconds', 'customer', 'Booking placed'),
   ('bkg_94', 1, 'assigned', now() - interval '449432 seconds', 'admin', NULL),
   ('bkg_89', 0, 'pending_assignment', now() - interval '451424 seconds', 'customer', 'Booking placed'),
@@ -1194,7 +1192,6 @@ INSERT INTO booking_events (booking_id, position, kind, at, by_role, note) VALUE
   ('bkg_79', 7, 'payment_received', now() - interval '165586 seconds', 'system', NULL),
   ('bkg_79', 8, 'reviewed', now() - interval '158986 seconds', 'customer', NULL),
   ('bkg_100', 0, 'pending_assignment', now() - interval '107984 seconds', 'customer', 'Booking placed'),
-  ('bkg_100', 1, 'clarification_requested', now() - interval '10800 seconds', 'admin', 'Is the wall inside or outside, and roughly how big is the damp area?'),
   ('bkg_90', 0, 'pending_assignment', now() - interval '107324 seconds', 'customer', 'Booking placed'),
   ('bkg_85', 0, 'pending_assignment', now() - interval '106904 seconds', 'customer', 'Booking placed'),
   ('bkg_85', 1, 'assigned', now() - interval '105671 seconds', 'admin', NULL),
@@ -1206,19 +1203,14 @@ INSERT INTO booking_events (booking_id, position, kind, at, by_role, note) VALUE
   ('bkg_95', 4, 'arrived', now() - interval '83874 seconds', 'vendor', NULL),
   ('bkg_95', 5, 'in_progress', now() - interval '82327 seconds', 'vendor', NULL);
 
-INSERT INTO booking_inspections (booking_id, description, fee, status, awaiting_customer, no_work_note, quote_amount, quote_note, quote_vendor_id, quote_created_at, quote_responded_at, quote_responded_by) VALUES
-  ('bkg_99', 'Bedroom fan stopped working and the switchboard next to it sparks sometimes.', 199, 'quoted', false, NULL, 600, 'Parts included. Takes about 40 minutes.', 'ven_1', now() - interval '1800 seconds', NULL, NULL),
-  ('bkg_98', 'AC is not cooling properly and makes a rattling sound when it starts. Not sure what the problem is.', 199, 'pending', false, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-  ('bkg_100', 'Damp patches and peeling paint on one wall, want it fixed and repainted.', 199, 'pending', true, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+INSERT INTO booking_inspections (booking_id, description, fee, status, no_work_note, quote_amount, quote_note, quote_vendor_id, quote_created_at, quote_responded_at, quote_responded_by) VALUES
+  ('bkg_99', 'Bedroom fan stopped working and the switchboard next to it sparks sometimes.', 199, 'quoted', NULL, 600, 'Parts included. Takes about 40 minutes.', 'ven_1', now() - interval '1800 seconds', NULL, NULL),
+  ('bkg_98', 'AC is not cooling properly and makes a rattling sound when it starts. Not sure what the problem is.', 199, 'pending', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+  ('bkg_100', 'Damp patches and peeling paint on one wall, want it fixed and repainted.', 199, 'pending', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 INSERT INTO inspection_quote_lines (booking_id, position, description, amount) VALUES
   ('bkg_99', 0, 'Replace fan capacitor (2.5 µF)', 350),
   ('bkg_99', 1, 'Replace burnt switch and rewire board point', 250);
-
-INSERT INTO inspection_messages (id, booking_id, position, from_role, author_name, text, at) VALUES
-  ('msg_seed_1', 'bkg_99', 0, 'vendor', 'Ravi Patil', 'Does the fan hum when switched on, or is it completely silent?', now() - interval '72000 seconds'),
-  ('msg_seed_2', 'bkg_99', 1, 'customer', 'Priya Sharma', 'It hums but does not spin.', now() - interval '68400 seconds'),
-  ('msg_seed_3', 'bkg_100', 0, 'admin', 'Profecian support', 'Is the wall inside or outside, and roughly how big is the damp area?', now() - interval '10800 seconds');
 
 INSERT INTO reviews (id, booking_id, customer_id, customer_name, vendor_id, category_id, rating, text, status, created_at) VALUES
   ('rev_1', 'bkg_1', 'cus_8', 'Karan Malhotra', 'ven_4', 'appliance-repair', 4, 'Very professional and on time. Fixed the issue quickly.', 'published', now() - interval '5259327 seconds'),

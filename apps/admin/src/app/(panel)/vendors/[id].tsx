@@ -3,8 +3,7 @@ import { Image } from 'expo-image';
 import { useMemo } from 'react';
 import { View } from 'react-native';
 import {
-  computeVendorWallet, DOC_STATUS, formatDateTime, formatINR, formatPhone, KYC_LABEL, useAction, useBackend, VENDOR_STATUS,
-} from '@profecian/shared';
+  computeVendorWallet, DOC_STATUS, formatDateTime, formatINR, formatPhone, KYC_LABEL, useAction, useBackend, VENDOR_STATUS, RELIABILITY_LOW, RELIABILITY_MIN_ACCEPTED, reliabilityLabel, reliabilityOf } from '@profecian/shared';
 import {
   AppText, Badge, Banner, Button, ChipGroup, colors, confirmAction, Divider, EmptyState, KeyValue, promptText, radius, spacing, StatCard,
 } from '@profecian/ui';
@@ -27,7 +26,7 @@ export default function VendorDetail() {
     const mine = db.bookings.filter((b) => b.vendorId === v.id);
     const done = mine.filter((b) => b.status === 'completed');
     const cancelled = mine.filter((b) => b.status === 'cancelled').length;
-    return { total: mine.length, done: done.length, cancelled, completionRate: mine.length ? Math.round((done.length / mine.length) * 100) : 0, wallet: computeVendorWallet(v.id, db.bookings, db.payouts) };
+    return { total: mine.length, done: done.length, cancelled, reliability: reliabilityOf(db, v), wallet: computeVendorWallet(v.id, db.bookings, db.payouts) };
   }, [v, db]);
 
   if (!v || !stats) {
@@ -70,7 +69,14 @@ export default function VendorDetail() {
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
         <StatCard label="Rating" value={v.rating ? `★ ${v.rating}` : '—'} icon="star-outline" tone="warning" hint={`${v.ratingCount} reviews`} />
-        <StatCard label="Jobs completed" value={String(stats.done)} icon="checkmark-done-outline" tone="success" hint={`${stats.completionRate}% completion`} />
+        <StatCard
+          label="Completion rate"
+          value={reliabilityLabel(stats.reliability)}
+          icon="ribbon-outline"
+          tone={stats.reliability.rate != null && stats.reliability.rate < RELIABILITY_LOW ? 'danger' : 'success'}
+          hint={stats.reliability.rate == null ? `${stats.reliability.accepted} of ${RELIABILITY_MIN_ACCEPTED} jobs accepted` : `${stats.reliability.lateReleases} late ${stats.reliability.lateReleases === 1 ? 'release' : 'releases'} of ${stats.reliability.accepted} accepted`}
+        />
+        <StatCard label="Jobs completed" value={String(stats.done)} icon="checkmark-done-outline" tone="success" />
         <StatCard label="Cancelled" value={String(stats.cancelled)} icon="close-circle-outline" tone="danger" />
         <StatCard label="Net earnings" value={formatINR(stats.wallet.netEarnings)} icon="wallet-outline" hint={`Balance ${formatINR(stats.wallet.balance)}`} />
       </View>

@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { CityNotice } from '@/components/CityNotice';
 import { Container } from '@/components/Container';
 import { EmptyState } from '@/components/EmptyState';
 import { FadeIn } from '@/components/FadeIn';
@@ -17,6 +18,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { ServiceCard } from '@/components/ServiceCard';
 import { ServiceReviews } from '@/components/ServiceReviews';
 import { useCart } from '@/context/CartContext';
+import { useLocation } from '@/context/LocationContext';
 import { groupCart, otherIssue, useCatalog } from '@/data/services';
 import { useResponsive } from '@/hooks/useResponsive';
 import { colors, createStyles, fonts, gradients, radius, shadows, spacing } from '@/theme';
@@ -32,9 +34,10 @@ const PROMISES = [
 
 export default function ServiceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { services, getService } = useCatalog();
+  const { services, allServices, getService } = useCatalog();
   const service = getService(id);
   const cart = useCart();
+  const { blockedFor, city, cityInfo } = useLocation();
   const { isMobile, isDesktop, select } = useResponsive();
 
   if (!service) {
@@ -52,7 +55,9 @@ export default function ServiceDetailScreen() {
   }
 
   const options = [...service.issues, otherIssue(service)];
-  const group = groupCart(services, cart.items).find((g) => g.service.id === service.id);
+  const group = groupCart(allServices, cart.items).find((g) => g.service.id === service.id);
+  // Can't be booked at the current location (city not open, or this service not offered there).
+  const blocked = blockedFor(service);
   const selectedCount = group?.lines.length ?? 0;
   const otherCount = cart.count - selectedCount;
   const others = services.filter((s) => s.id !== service.id).slice(0, select({ mobile: 2, tablet: 3, desktop: 4 }));
@@ -108,10 +113,20 @@ export default function ServiceDetailScreen() {
           </FadeIn>
 
           <FormCard title="What do you need help with?" icon="construct-outline">
-            <AppText variant="small">Pick one or more — each one you select goes into your cart. Pick the date and address at checkout.</AppText>
-            <View style={styles.issues} accessibilityLabel="Problems">
+            {blocked ? <CityNotice reason={blocked} /> : (
+              <AppText variant="small">
+                Pick one or more — each one you select goes into your cart. Pick the date and address at checkout.{cityInfo ? ` Prices shown are for ${city}.` : ''}
+              </AppText>
+            )}
+            <View style={[styles.issues, blocked ? { opacity: 0.55 } : null]} accessibilityLabel="Problems">
               {options.map((issue) => (
-                <IssueCard key={issue.id} issue={issue} selected={cart.has(service.id, issue.id)} onPress={() => cart.toggle(service.id, issue.id)} />
+                <IssueCard
+                  key={issue.id}
+                  issue={issue}
+                  selected={cart.has(service.id, issue.id)}
+                  // Selected items can still be removed; nothing new is added while booking is closed here.
+                  onPress={() => (!blocked || cart.has(service.id, issue.id)) && cart.toggle(service.id, issue.id, cityInfo?.name)}
+                />
               ))}
             </View>
           </FormCard>

@@ -45,6 +45,8 @@ export interface ProblemType {
   pricingModel: PricingModel;
   durationMins: number;
   enabled: boolean;
+  /** Exact prices for single cities (by city name), used as typed instead of the city's price level. */
+  cityPrices?: Record<string, number>;
 }
 
 /* ───────────── People ───────────── */
@@ -121,6 +123,12 @@ export interface Vendor {
   jobsCompleted: number;
   location: { lat: number; lng: number };
   joinedAt: Timestamp;
+  /**
+   * Totals behind the completion rate, counted from booking history by the real backend (see
+   * reliabilityOf). Not stored, and absent in the mock, which counts from its own bookings.
+   */
+  acceptedJobs?: number;
+  lateReleases?: number;
   /** Set when the vendor submits documents for review; cleared if rejected docs need re-upload. */
   kycSubmittedAt?: Timestamp;
   rejectionReason?: string;
@@ -177,12 +185,45 @@ export type BookingEventKind =
   | 'payment_received'
   | 'payment_failed'
   | 'reviewed'
-  | 'clarification_requested'
-  | 'clarification_answered'
   | 'quote_shared'
   | 'quote_approved'
   | 'quote_declined'
-  | 'no_work_needed';
+  | 'no_work_needed'
+  /** The professional took back their last step within the undo window. */
+  | 'step_undone'
+  /** The professional gave an accepted job back; it returns to the admin's queue. */
+  | 'released'
+  /** The professional reported a problem on site for the admin to decide. */
+  | 'issue_reported'
+  | 'issue_resolved';
+
+/** Why a professional gave an accepted job back. */
+export type ReleaseReason = 'unwell' | 'vehicle_problem' | 'previous_job_late' | 'wrong_service' | 'other';
+
+/** One release of a booking by a professional who had accepted it. Kept as history — the completion rate is worked out from these. */
+export interface JobRelease {
+  vendorId: ID;
+  vendorName: string;
+  reason: ReleaseReason;
+  note?: string;
+  /** 2 hours or less to the slot, or already on the way. Only late releases lower the completion rate. */
+  late: boolean;
+  at: Timestamp;
+}
+
+/** A problem a professional reports on site instead of releasing: the admin decides what happens. */
+export type JobIssueKind = 'customer_unavailable' | 'cant_do' | 'cant_complete';
+export type CantCompleteReason = 'needs_part' | 'bigger_problem' | 'safety' | 'other';
+
+export interface JobIssue {
+  kind: JobIssueKind;
+  /** For "can't complete". */
+  reason?: CantCompleteReason;
+  note?: string;
+  vendorId: ID;
+  vendorName: string;
+  at: Timestamp;
+}
 
 export interface BookingEvent {
   kind: BookingEventKind;
@@ -226,27 +267,27 @@ export interface InspectionQuote {
   respondedBy?: 'customer' | 'admin';
 }
 
-export interface ClarificationMessage {
-  id: ID;
-  from: Role;
-  authorName: string;
-  text: string;
-  at: Timestamp;
-}
+/**
+ * What a quote on a booking is for:
+ * - not_sure: the customer chose "Other / Not sure" — an inspection visit, then a quote that replaces the inspection fee.
+ * - extra_work: a normal booking where the professional found more work on site — a quote added on top of the booked work.
+ */
+export type QuoteKind = 'not_sure' | 'extra_work';
 
-/** The customer could not pick a problem: the professional inspects, then quotes, within the chosen category. */
+/**
+ * A booking's quote thread. Started by the customer ("Other / Not sure": the professional inspects,
+ * then quotes, within the chosen category) or by the professional on site (a quote for extra work).
+ */
 export interface InspectionRequest {
-  /** What the customer described at checkout (required). */
+  /** Absent means not_sure (bookings made before extra-work quotes existed). */
+  kind?: QuoteKind;
+  /** What the customer described at checkout (required for "Not sure"; empty for extra work). */
   description: string;
   photos: string[];
-  /** Visit charge before GST, billed unless a quote is approved. */
+  /** Visit charge before GST, billed unless a quote is approved. Zero for extra work — the booked work is charged either way. */
   fee: number;
   status: InspectionStatus;
   quote?: InspectionQuote;
-  /** Questions and answers between customer, professional and support. */
-  messages: ClarificationMessage[];
-  /** A question to the customer is waiting for their reply. */
-  awaitingCustomer: boolean;
   noWorkNote?: string;
 }
 
@@ -273,7 +314,23 @@ export interface Booking {
   vendorId?: ID;
   price: PriceBreakdown;
   payment: BookingPayment;
+  /** "Before" photos — optional. */
   proofPhotos: string[];
+  /** "After" photos — at least one is needed before the professional can complete the service. */
+  afterPhotos?: string[];
+  /**
+   * 4-digit code created when the professional arrives. The customer reads it out and the
+   * professional enters it to start the service. Never sent to the professional's app.
+   */
+  startCode?: string;
+  /** Wrong start codes entered so far (mock backend bookkeeping; the real backend keeps this server-side). */
+  startCodeAttempts?: number;
+  /** Every time a professional released this booking after accepting it, oldest first. Admin only. */
+  releases?: JobRelease[];
+  /** Released late and still waiting for a professional: top of the admin's assignment queue. */
+  urgent?: boolean;
+  /** An open on-site report waiting for the admin's decision. */
+  issue?: JobIssue;
   timeline: BookingEvent[];
   createdAt: Timestamp;
   cancelReason?: string;
@@ -333,6 +390,10 @@ export type NotificationKind =
   | 'booking_confirmed'
   | 'vendor_assigned'
   | 'vendor_on_the_way'
+  | 'vendor_arrived'
+  | 'job_released'
+  | 'professional_released'
+  | 'job_issue'
   | 'service_completed'
   | 'payment_received'
   | 'booking_cancelled'
@@ -344,8 +405,6 @@ export type NotificationKind =
   | 'vendor_pending_approval'
   | 'payment_failed'
   | 'new_complaint'
-  | 'clarification_requested'
-  | 'clarification_answered'
   | 'quote_shared'
   | 'quote_response';
 
@@ -389,7 +448,34 @@ export interface PlatformSettings {
   defaultCommissionRate: number;
   /** Inspection visit charge for "Other / Not sure" when a category has none. */
   defaultInspectionFee: number;
-  cities: string[];
+  /** Every city the platform knows, in display order — see {@link City}. */
+  cities: City[];
   whatsappNumber: string;
   supportPhone: string;
+}
+
+/**
+ * live: customers can book. coming_soon: shown as "coming soon"; vendors can already register (to
+ * build supply before launch). paused: temporarily closed — no new bookings, existing ones continue.
+ */
+export type CityStatus = 'live' | 'coming_soon' | 'paused';
+
+export interface City {
+  /** Unique and fixed once created — addresses, customers, vendors and bookings store the city by name. */
+  name: string;
+  state: string;
+  status: CityStatus;
+  /** City centre. */
+  lat: number;
+  lng: number;
+  /** "Use current location" only matches a city within this distance of its centre. */
+  radiusKm: number;
+  /** Localities vendors pick as service areas. */
+  areas: string[];
+  /** Service categories not offered in this city yet (everything else enabled is). */
+  disabledCategoryIds: ID[];
+  /** Prices here as a percentage of the base price: 100 = base, 120 = 20% dearer. See cityPrice(). */
+  priceLevel: number;
+  /** Platform commission for bookings in this city, 0–1. Unset → the category's rate. */
+  commissionRate?: number;
 }

@@ -17,8 +17,11 @@ import com.profecian.files.FileRefs;
 import com.profecian.live.LiveEvents;
 import com.profecian.notifications.NotificationService;
 import com.profecian.notifications.NotifyFor;
+import com.profecian.pricing.CityPricing;
 import com.profecian.pricing.Pricing;
 import com.profecian.reviews.Review;
+import com.profecian.settings.City;
+import com.profecian.settings.CityService;
 import com.profecian.settings.PlatformSettings;
 import com.profecian.settings.SettingsService;
 import com.profecian.sync.Api;
@@ -47,6 +50,7 @@ public class CustomerBookingService {
   private final ProblemTypeRepository problemTypes;
   private final CustomerService customers;
   private final SettingsService settings;
+  private final CityService cities;
   private final VendorRepository vendors;
   private final Review.Repository reviews;
   private final Complaint.Repository complaints;
@@ -57,7 +61,7 @@ public class CustomerBookingService {
   private final LiveEvents live;
 
   public CustomerBookingService(BookingCore core, BookingRepository bookings, InspectionActions inspections, CategoryRepository categories,
-                                ProblemTypeRepository problemTypes, CustomerService customers, SettingsService settings, VendorRepository vendors,
+                                ProblemTypeRepository problemTypes, CustomerService customers, SettingsService settings, CityService cities, VendorRepository vendors,
                                 Review.Repository reviews, Complaint.Repository complaints, NotifyFor notify, NotificationService notifications,
                                 FileRefs files, ApiMapper mapper, LiveEvents live) {
     this.core = core;
@@ -67,6 +71,7 @@ public class CustomerBookingService {
     this.problemTypes = problemTypes;
     this.customers = customers;
     this.settings = settings;
+    this.cities = cities;
     this.vendors = vendors;
     this.reviews = reviews;
     this.complaints = complaints;
@@ -122,6 +127,11 @@ public class CustomerBookingService {
       else problems.add(p);
     }
     if (category == null || missing) throw ApiException.bad("This service is currently unavailable");
+    // The visit's city must be live and offer this service (bookingBlockedReason in cities.ts).
+    if (in.address() != null) {
+      String blocked = cities.bookingBlockedReason(in.address().city(), category);
+      if (blocked != null) throw ApiException.bad(blocked);
+    }
     if (problems.isEmpty() && in.inspection() == null) throw ApiException.bad("Choose a problem, or “Other / Not sure”");
     String description = in.inspection() == null || in.inspection().description() == null ? "" : in.inspection().description().trim();
     if (in.inspection() != null && description.length() < INSPECTION_MIN_DETAILS) {
@@ -140,7 +150,9 @@ public class CustomerBookingService {
     b.customerName = in.contactName() == null ? customer.name : in.contactName().trim();
     b.customerPhone = Phones.normalize(in.contactPhone());
     b.categoryId = category.id;
-    for (ProblemType p : problems) b.items.add(new Booking.Item(p.id, p.name, p.price));
+    // Prices, the inspection fee and the commission all follow the city of the visit address.
+    City city = cities.find(address.city).orElse(null);
+    for (ProblemType p : problems) b.items.add(new Booking.Item(p.id, p.name, CityPricing.problemPrice(p, city)));
     b.problemTypeId = problems.isEmpty() ? null : problems.get(0).id;
     b.date = in.date();
     b.slot = in.slot();
@@ -162,11 +174,11 @@ public class CustomerBookingService {
       i.description = description;
       List<String> photos = files.attachAll(in.inspection().photos(), user);
       i.photos.addAll(photos.subList(0, Math.min(photos.size(), INSPECTION_MAX_PHOTOS)));
-      i.fee = category.inspectionFee != null ? category.inspectionFee : s.defaultInspectionFee;
+      i.fee = CityPricing.inspectionFee(category, s, city);
       i.status = "pending";
       b.inspection = i;
     }
-    BigDecimal rate = category.commissionRate != null ? category.commissionRate : s.defaultCommissionRate;
+    BigDecimal rate = CityPricing.commissionRate(category, s, city);
     BookingCore.apply(b, Pricing.compute(Pricing.serviceAmount(b.items.stream().map(x -> x.price).toList(), b.inspection == null ? null : b.inspection.fee, null), rate, s.taxRate));
     core.event(b, BookingRules.PENDING_ASSIGNMENT, "customer", "Booking placed");
     return core.commit(b, notify.bookingCreated(b));
@@ -176,19 +188,6 @@ public class CustomerBookingService {
     Booking b = core.load(bookingId);
     if (!b.customerId.equals(user.id())) throw ApiException.notFound("Booking not found");
     return b;
-  }
-
-  @Transactional
-  public Api.Booking answerClarification(CurrentUser user, String bookingId, String answer) {
-    Booking b = own(user, bookingId);
-    Inspection i = core.openInspection(b);
-    String text = answer == null ? "" : answer.trim();
-    if (text.length() < 2) throw ApiException.bad("Type your answer");
-    String name = customers.get(user.id()).name;
-    core.addMessage(i, "customer", name, text);
-    i.awaitingCustomer = false;
-    core.event(b, "clarification_answered", "customer", text);
-    return mapper.booking(core.commit(b, notify.clarificationAnswered(b, text)));
   }
 
   @Transactional
@@ -203,6 +202,8 @@ public class CustomerBookingService {
     String why = reason == null || reason.isBlank() ? "Cancelled by customer" : reason.trim();
     core.moveTo(b, BookingRules.CANCELLED, BookingCore.Actor.customer, why);
     b.cancelReason = why;
+    b.urgent = false;
+    b.clearIssue();
     return mapper.booking(core.commit(b, notify.cancelled(b, "customer")));
   }
 

@@ -1,6 +1,6 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Platform, View } from 'react-native';
-import { bookingProblemNames, formatDate, formatDateTime, formatINR, formatPhone, PAYMENT_METHOD_LABEL, useDb } from '@profecian/shared';
+import { bookingProblemNames, formatDate, formatDateTime, formatINR, formatPhone, PAYMENT_METHOD_LABEL, useDb, isExtraWork } from '@profecian/shared';
 import { Button as UiButton, Card, Divider } from '@profecian/ui';
 import { AppText } from '@/components/AppText';
 import { Container } from '@/components/Container';
@@ -66,7 +66,13 @@ export default function Invoice() {
             <View style={{ flex: 1 }}>
               <AppText variant="label">{category?.name} — {bookingProblemNames(db, b).join(', ')}</AppText>
               <AppText variant="small">Booking #{b.code} · {formatDate(b.date)}, {b.slot}{vendor ? ` · by ${vendor.name}` : ''}</AppText>
-              {b.inspection ? (
+              {isExtraWork(b) ? (
+                b.inspection?.status === 'approved' && b.inspection.quote ? (
+                  <AppText variant="small">
+                    Extra work you approved: {b.inspection.quote.lines.map((l) => `${l.description} ${formatINR(l.amount)}`).join(', ')}
+                  </AppText>
+                ) : null
+              ) : b.inspection ? (
                 <AppText variant="small">
                   {b.inspection.status === 'approved' && b.inspection.quote
                     ? `Approved repair: ${b.inspection.quote.lines.map((l) => `${l.description} ${formatINR(l.amount)}`).join(', ')}`

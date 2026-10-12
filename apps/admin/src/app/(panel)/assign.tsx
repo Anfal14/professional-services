@@ -1,20 +1,23 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { bySchedule, formatDate, formatINR, useDb } from '@profecian/shared';
+import { awaitingAfterRelease, byUrgencyThenSchedule, formatDate, formatINR } from '@profecian/shared';
 import { AppText, Badge, Button, ChipGroup, colors, EmptyState, radius, spacing, type WebPressableState } from '@profecian/ui';
 import { Cell, DataTable, Page, Panel, Row } from '@/components/admin';
+import { useCityScope, useScopedDb } from '@/components/cityScope';
 import { useLookups } from '@/components/lookups';
 import { VendorPicker } from '@/components/VendorPicker';
 
 export default function AssignmentBoard() {
-  const db = useDb();
+  const db = useScopedDb();
+  const { city } = useCityScope();
   const { serviceLabel, category } = useLookups();
   const [service, setService] = useState<string>('all');
   const queue = useMemo(
     () => db.bookings
       .filter((b) => b.status === 'pending_assignment' && (service === 'all' || b.categoryId === service))
-      .sort(bySchedule),
+      // Late releases jump the queue; otherwise soonest first.
+      .sort(byUrgencyThenSchedule),
     [db.bookings, service],
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -36,7 +39,7 @@ export default function AssignmentBoard() {
   const serviceOptions = [{ value: 'all', label: 'All services' }, ...db.categories.filter((c) => c.enabled).map((c) => ({ value: c.id, label: c.name }))];
 
   return (
-    <Page title="Vendor assignment" subtitle="Unassigned bookings, soonest first. Suggestions rank the nearest, least busy and best rated professionals." permission="bookings">
+    <Page title="Vendor assignment" subtitle={`${city ? `Unassigned bookings in ${city}` : 'Unassigned bookings'}: urgent releases first, then soonest. Suggestions rank the nearest, least busy and best rated professionals.`} permission="bookings" cityFilter>
       <ChipGroup value={service} onChange={setService} options={serviceOptions} />
       {queue.length === 0 ? (
         <Panel><EmptyState icon="checkmark-done-circle-outline" title="Queue is empty" message="Every booking has a professional assigned." /></Panel>
@@ -59,6 +62,7 @@ export default function AssignmentBoard() {
                 >
                   <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                     <AppText variant="label" style={{ flex: 1 }}>{b.code}</AppText>
+                    {awaitingAfterRelease(b) ? <Badge label={b.urgent ? 'Urgent' : 'Released'} tone={b.urgent ? 'danger' : 'warning'} /> : null}
                     <Badge label={formatDate(b.date) === formatDate(today) ? 'Today' : formatDate(b.date)} tone={b.date === today ? 'warning' : 'neutral'} />
                   </View>
                   <AppText variant="bodyMedium" numberOfLines={1}>{serviceLabel(b)}</AppText>

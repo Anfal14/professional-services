@@ -7,11 +7,11 @@ import { toISODate, TIME_SLOTS } from './format';
 import { inspectionServiceAmount } from './inspection';
 import { computeBreakdown } from './pricing';
 import type {
-  AdminUser, AppNotification, Booking, BookingEvent, BookingStatus, Complaint, Customer, Database, InspectionRequest,
+  AdminUser, AppNotification, Booking, BookingEvent, BookingStatus, City, Complaint, Customer, Database, InspectionRequest,
   KycDocument, PaymentMethod, Payout, ProblemType, Review, ServiceCategory, Vendor,
 } from './types';
 
-export const DB_VERSION = 7;
+export const DB_VERSION = 13;
 
 /* ───────────── Demo identities (shown as hints on login screens) ───────────── */
 
@@ -182,6 +182,39 @@ const VENDORS: [name: string, city: string, cats: string[], status: Vendor['stat
   ['Ganesh Waghmare', 'Nagpur', ['pest-control'], 'rejected'],
 ];
 
+type CitySeed = [name: string, state: string, status: City['status'], radiusKm: number, areas: string[], disabledCategoryIds?: string[]];
+
+/** Served cities. Live ones take bookings; coming-soon ones are recruiting vendors (Kolhapur has a pending sign-up). */
+const CITIES: CitySeed[] = [
+  ['Solapur', 'Maharashtra', 'live', 20, ['Sadar Bazar', 'Hotgi Road', 'Vijapur Naka', 'Akkalkot Road', 'Jule Solapur']],
+  ['Pune', 'Maharashtra', 'live', 30, ['Kothrud', 'Hinjewadi', 'Viman Nagar', 'Hadapsar', 'Baner']],
+  // Pest control hasn't launched in Mumbai yet.
+  ['Mumbai', 'Maharashtra', 'live', 40, ['Andheri', 'Bandra', 'Powai', 'Thane', 'Dadar'], ['pest-control']],
+  ['Bengaluru', 'Karnataka', 'live', 35, ['Indiranagar', 'Koramangala', 'Whitefield', 'HSR Layout', 'Jayanagar']],
+  ['Hyderabad', 'Telangana', 'live', 35, ['Jubilee Hills', 'Banjara Hills', 'Gachibowli', 'Madhapur', 'Kukatpally']],
+  ['Delhi', 'Delhi', 'coming_soon', 40, ['Connaught Place', 'Saket', 'Dwarka', 'Rohini', 'Lajpat Nagar']],
+  ['Nagpur', 'Maharashtra', 'coming_soon', 25, ['Dharampeth', 'Sitabuldi', 'Manish Nagar', 'Civil Lines', 'Sadar']],
+  ['Kolhapur', 'Maharashtra', 'coming_soon', 20, ['Rajarampuri', 'Shahupuri', 'Tarabai Park', 'Kasaba Bawada', 'Shivaji Peth']],
+];
+
+/** Metros cost more than the base (Solapur) prices; Mumbai also takes a higher commission. Unlisted cities are at 100%. */
+const CITY_PRICING: Record<string, { priceLevel: number; commissionRate?: number }> = {
+  Pune: { priceLevel: 110 },
+  Mumbai: { priceLevel: 125, commissionRate: 0.22 },
+  Bengaluru: { priceLevel: 120 },
+  Hyderabad: { priceLevel: 110 },
+  Delhi: { priceLevel: 125 },
+};
+
+/** Exact prices for one problem in one city, instead of that city's price level. */
+export const SEED_CITY_PRICES: { problemTypeId: string; city: string; price: number }[] = [
+  { problemTypeId: 'el-fan', city: 'Mumbai', price: 349 },
+];
+
+export const SEED_CITIES: City[] = CITIES.map(([name, state, status, radiusKm, areas, disabledCategoryIds = []]) => ({
+  name, state, status, ...CITY_CENTRES[name], radiusKm, areas, disabledCategoryIds, ...(CITY_PRICING[name] ?? { priceLevel: 100 }),
+}));
+
 const ADMINS: AdminUser[] = [
   { id: 'adm_1', name: 'Aditi Verma', email: DEMO.adminEmail, role: 'super_admin' },
   { id: 'adm_2', name: 'Nikhil Rao', email: 'ops@profecian.app', role: 'operations' },
@@ -216,12 +249,16 @@ export function createSeedDatabase(now = new Date()): Database {
   };
 
   const { categories, problemTypes } = buildCatalogue();
+  for (const o of SEED_CITY_PRICES) {
+    const p = problemTypes.find((x) => x.id === o.problemTypeId);
+    if (p) p.cityPrices = { ...p.cityPrices, [o.city]: o.price };
+  }
   const catById = new Map(categories.map((c) => [c.id, c]));
   const settings: Database['settings'] = {
     taxRate: 0.18,
     defaultCommissionRate: 0.2,
     defaultInspectionFee: 199,
-    cities: Object.keys(CITY_CENTRES),
+    cities: SEED_CITIES,
     whatsappNumber: '919876543210',
     supportPhone: '+91 98765 43210',
   };
@@ -337,6 +374,10 @@ export function createSeedDatabase(now = new Date()): Database {
           ? { status: 'unpaid' }
           : { method: rnd() < 0.5 ? 'cash' : undefined, status: 'unpaid' },
       proofPhotos: [],
+      afterPhotos: [],
+      // A professional who has already arrived is waiting for the customer's start code (derived
+      // from the booking number, not the random stream, so the rest of the demo data is unchanged).
+      ...(opts.status === 'arrived' ? { startCode: String((i * 7919) % 10_000).padStart(4, '0') } : {}),
       timeline,
       createdAt: iso(created),
       cancelReason: opts.status === 'cancelled' ? 'Plans changed' : undefined,
@@ -379,11 +420,11 @@ export function createSeedDatabase(now = new Date()): Database {
   for (let k = 0; k < 4; k++) makeBooking(n++, { dayOffset: k % 2, status: pick(['assigned', 'accepted', 'in_progress'] as const) });
   // "Other / Not sure" examples — one per stage, in different categories. The category stays the
   // customer's choice; there is no problem type, only an inspection request priced at the visit fee.
-  const notSure = (b: Booking, inspection: Omit<InspectionRequest, 'fee' | 'photos' | 'messages' | 'awaitingCustomer'> & Partial<InspectionRequest>, extra: BookingEvent[] = []) => {
+  const notSure = (b: Booking, inspection: Omit<InspectionRequest, 'fee' | 'photos'> & Partial<InspectionRequest>, extra: BookingEvent[] = []) => {
     const category = catById.get(b.categoryId)!;
     b.problemTypeId = undefined;
     b.items = [];
-    b.inspection = { photos: [], messages: [], awaitingCustomer: false, fee: category.inspectionFee ?? settings.defaultInspectionFee, ...inspection };
+    b.inspection = { photos: [], fee: category.inspectionFee ?? settings.defaultInspectionFee, ...inspection };
     b.price = computeBreakdown(inspectionServiceAmount(b), category.commissionRate, settings.taxRate);
     b.timeline.push(...extra);
   };
@@ -398,10 +439,6 @@ export function createSeedDatabase(now = new Date()): Database {
   notSure(makeBooking(n++, { dayOffset: 0, status: 'in_progress', vendor: demoVendor, customer: demoCustomer, categoryId: 'electrician', slot: '09:00 AM' }), {
     status: 'quoted',
     description: 'Bedroom fan stopped working and the switchboard next to it sparks sometimes.',
-    messages: [
-      { id: 'msg_seed_1', from: 'vendor', authorName: demoVendor.name, text: 'Does the fan hum when switched on, or is it completely silent?', at: at(20) },
-      { id: 'msg_seed_2', from: 'customer', authorName: demoCustomer.name, text: 'It hums but does not spin.', at: at(19) },
-    ],
     quote: {
       lines: [
         { description: 'Replace fan capacitor (2.5 µF)', amount: 350 },
@@ -413,17 +450,13 @@ export function createSeedDatabase(now = new Date()): Database {
       createdAt: at(0.5),
     },
   }, [
-    { kind: 'clarification_requested', at: at(20), by: 'vendor', note: 'Does the fan hum when switched on, or is it completely silent?' },
-    { kind: 'clarification_answered', at: at(19), by: 'customer', note: 'It hums but does not spin.' },
     { kind: 'quote_shared', at: at(0.5), by: 'vendor', note: '2 items, ₹600 + GST' },
   ]);
-  // 3. Admin + customer: support needs details before assigning — Painting.
+  // 3. Admin + customer: waiting for a professional to be assigned — Painting.
   notSure(makeBooking(n++, { dayOffset: 4, status: 'pending_assignment', customer: demoCustomer, categoryId: 'painting', slot: '10:00 AM' }), {
     status: 'pending',
     description: 'Damp patches and peeling paint on one wall, want it fixed and repainted.',
-    awaitingCustomer: true,
-    messages: [{ id: 'msg_seed_3', from: 'admin', authorName: 'Profecian support', text: 'Is the wall inside or outside, and roughly how big is the damp area?', at: at(3) }],
-  }, [{ kind: 'clarification_requested', at: at(3), by: 'admin', note: 'Is the wall inside or outside, and roughly how big is the damp area?' }]);
+  });
 
   // Vendor aggregates from reviews + completed jobs.
   for (const v of vendors) {

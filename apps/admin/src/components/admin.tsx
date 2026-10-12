@@ -1,12 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, usePathname } from 'expo-router';
 import Head from 'expo-router/head';
-import { useMemo, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Platform, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { can, useBackend, useSnapshot, type AdminPermission, type AdminUser } from '@profecian/shared';
 import {
   AppText, Avatar, Badge, colors, EmptyState, fonts, IconButton, radius, shadows, spacing, type IconName, type WebPressableState, createStyles, AppearanceSettings, Sheet, useTheme } from '@profecian/ui';
+import { CityFilter, useScopedDb } from './cityScope';
+import { GlobalSearch } from './GlobalSearch';
 
 /* ───────────── Session ───────────── */
 
@@ -22,6 +24,7 @@ export const NAV: { href: string; label: string; icon: IconName; perm: AdminPerm
   { href: '/vendors', label: 'Vendors', icon: 'construct-outline', perm: 'vendors' },
   { href: '/users', label: 'Users', icon: 'people-outline', perm: 'users' },
   { href: '/services', label: 'Services', icon: 'layers-outline', perm: 'services' },
+  { href: '/cities', label: 'Cities', icon: 'business-outline', perm: 'settings' },
   { href: '/payments', label: 'Payments', icon: 'wallet-outline', perm: 'payments' },
   { href: '/reviews', label: 'Reviews & complaints', icon: 'chatbubbles-outline', perm: 'reviews' },
   { href: '/analytics', label: 'Analytics', icon: 'bar-chart-outline', perm: 'analytics' },
@@ -42,16 +45,33 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const wide = width >= 1024;
   const [menuOpen, setMenuOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const { scheme } = useTheme();
+  const mac = Platform.OS === 'web' && typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+
+  // Ctrl/Cmd + K opens search from anywhere in the panel.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const unread = db.notifications.filter((n) => n.audience === 'admin' && !n.read).length;
   const items = NAV.filter((n) => can(admin, n.perm));
+  // Sidebar counts follow the city filter, so they match the sections they open.
+  const scoped = useScopedDb();
 
   const nav = (
     <View style={styles.navList}>
       {items.map((item) => {
         const active = isActive(pathname, item.href);
-        const badge = item.href === '/assign' ? db.bookings.filter((b) => b.status === 'pending_assignment').length
-          : item.href === '/vendors' ? db.vendors.filter((v) => v.status === 'pending').length : 0;
+        const badge = item.href === '/assign' ? scoped.bookings.filter((b) => b.status === 'pending_assignment').length
+          : item.href === '/vendors' ? scoped.vendors.filter((v) => v.status === 'pending').length : 0;
         return (
           <Pressable
             key={item.href}
@@ -92,7 +112,21 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <View style={{ flex: 1 }}>
         <View style={styles.topbar}>
           {!wide ? <IconButton icon={menuOpen ? 'close' : 'menu'} label="Menu" onPress={() => setMenuOpen((o) => !o)} /> : null}
-          {!wide ? <Brand compact /> : <View style={{ flex: 1 }} />}
+          {!wide ? <Brand compact badge={width >= 420} /> : (
+            <View style={{ flex: 1 }}>
+              <Pressable
+                onPress={() => setSearchOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Search the admin panel"
+                style={({ hovered }: WebPressableState) => [styles.searchButton, hovered && { borderColor: colors.borderStrong }]}
+              >
+                <Ionicons name="search" size={16} color={colors.muted} />
+                <AppText style={styles.searchButtonText} numberOfLines={1}>Search bookings, vendors, users…</AppText>
+                <View style={styles.kbd}><AppText style={styles.kbdText}>{mac ? '⌘K' : 'Ctrl K'}</AppText></View>
+              </Pressable>
+            </View>
+          )}
+          {!wide ? <IconButton icon="search" label="Search" onPress={() => setSearchOpen(true)} /> : null}
           <IconButton icon={scheme === 'dark' ? 'moon-outline' : 'sunny-outline'} label="Theme" onPress={() => setThemeOpen(true)} />
           <IconButton icon="notifications-outline" label="Notifications" badge={unread} onPress={() => router.navigate('/notifications' as never)} />
         </View>
@@ -107,25 +141,29 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <Sheet visible={themeOpen} onClose={() => setThemeOpen(false)} title="Theme" width={420}>
         <AppearanceSettings card={false} />
       </Sheet>
+      {/* Mounted only while open, so each search starts empty. */}
+      {searchOpen ? <GlobalSearch admin={admin} pages={items} onClose={() => setSearchOpen(false)} /> : null}
     </View>
   );
 }
 
-function Brand({ compact }: { compact?: boolean }) {
+/** `badge` is dropped on narrow phones so the top-bar buttons have room. */
+function Brand({ compact, badge = true }: { compact?: boolean; badge?: boolean }) {
   return (
-    <View style={[styles.brand, compact && { flex: 1, padding: 0 }]}>
+    <View style={[styles.brand, compact && { flex: 1, padding: 0, overflow: 'hidden' }]}>
       <View style={styles.mark}>
         <Ionicons name="flash" size={16} color={colors.white} />
       </View>
-      <AppText style={styles.word}>Profecian</AppText>
-      <Badge label="Admin" tone="primary" />
+      <AppText style={styles.word} numberOfLines={1}>Profecian</AppText>
+      {badge ? <Badge label="Admin" tone="primary" /> : null}
     </View>
   );
 }
 
 /* ───────────── Page scaffolding ───────────── */
 
-export function Page({ title, subtitle, actions, children, permission }: { title: string; subtitle?: string; actions?: ReactNode; children: ReactNode; permission?: AdminPermission }) {
+/** `cityFilter` puts the shared city filter in the header — for sections whose data is per city. */
+export function Page({ title, subtitle, actions, children, permission, cityFilter }: { title: string; subtitle?: string; actions?: ReactNode; children: ReactNode; permission?: AdminPermission; cityFilter?: boolean }) {
   const admin = useAdmin();
   const allowed = !permission || can(admin, permission);
   return (
@@ -136,7 +174,12 @@ export function Page({ title, subtitle, actions, children, permission }: { title
           <AppText variant="h1">{title}</AppText>
           {subtitle ? <AppText variant="small">{subtitle}</AppText> : null}
         </View>
-        {allowed ? <View style={styles.actions}>{actions}</View> : null}
+        {allowed ? (
+          <View style={styles.actions}>
+            {cityFilter ? <CityFilter /> : null}
+            {actions}
+          </View>
+        ) : null}
       </View>
       {allowed ? children : <EmptyState icon="lock-closed-outline" title="No access" message={`Your role (${admin?.role.replace('_', ' ')}) can't open this section. Ask a super admin for access.`} />}
     </ScrollView>
@@ -299,10 +342,11 @@ export function DataTable<T>({ columns, rows, rowKey, onRowPress, empty = 'Nothi
 }
 
 /** Two-line cell: primary text + muted secondary. */
-export function Cell({ title, sub }: { title: string; sub?: string }) {
+/** `lines` lets a long title wrap instead of being cut off (it never spills into the next column). */
+export function Cell({ title, sub, lines = 1 }: { title: string; sub?: string; lines?: number }) {
   return (
-    <View style={{ gap: 1 }}>
-      <AppText variant="label" numberOfLines={1}>{title}</AppText>
+    <View style={{ gap: 1, flexShrink: 1, minWidth: 0 }}>
+      <AppText variant="label" numberOfLines={lines}>{title}</AppText>
       {sub ? <AppText variant="small" numberOfLines={1}>{sub}</AppText> : null}
     </View>
   );
@@ -333,6 +377,10 @@ const styles = createStyles(() => ({
   tabText: { fontFamily: fonts.semibold, fontSize: 13.5, color: colors.text },
   tabCount: { minWidth: 22, height: 20, paddingHorizontal: 6, borderRadius: 10, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
   tabCountText: { fontFamily: fonts.bold, fontSize: 11, color: colors.muted },
+  searchButton: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 38, paddingHorizontal: 12, borderRadius: radius.md, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, maxWidth: 420 },
+  searchButtonText: { flex: 1, fontFamily: fonts.medium, fontSize: 13.5, color: colors.subtle },
+  kbd: { paddingHorizontal: 6, height: 20, borderRadius: 5, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  kbdText: { fontFamily: fonts.semibold, fontSize: 10.5, color: colors.muted },
   search: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 40, paddingHorizontal: 12, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, minWidth: 220, flexGrow: 1, maxWidth: 360 },
   searchInput: { flex: 1, fontFamily: fonts.medium, fontSize: 14, color: colors.ink, outlineStyle: 'none', minWidth: 0 } as object,
   table: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
@@ -340,7 +388,7 @@ const styles = createStyles(() => ({
   trHover: { backgroundColor: colors.surfaceAlt },
   th: { minHeight: 42, backgroundColor: colors.surfaceAlt },
   thText: { fontFamily: fonts.bold, fontSize: 11.5, color: colors.muted, letterSpacing: 0.4, textTransform: 'uppercase' },
-  cell: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 10 },
+  cell: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 10, overflow: 'hidden' },
   right: { justifyContent: 'flex-end' },
   pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md },
 }));

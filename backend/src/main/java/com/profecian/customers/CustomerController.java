@@ -71,7 +71,6 @@ public class CustomerController {
 
   public record Reschedule(LocalDate date, String slot) {}
 
-  public record Answer(String answer) {}
 
   public record QuoteAnswer(boolean approve) {}
 
@@ -98,11 +97,6 @@ public class CustomerController {
     CurrentUser u = CurrentUser.get();
     return idempotency.run(u.role() + ":" + u.id(), key, id + ":" + r.method() + ":" + r.simulateFailure(), Api.Booking.class,
         () -> payments.payOnline(u, id, r.method(), r.simulateFailure()));
-  }
-
-  @PostMapping("/bookings/{id}/clarification")
-  public Api.Booking answer(@PathVariable String id, @RequestBody Answer r) {
-    return bookings.answerClarification(CurrentUser.get(), id, r.answer());
   }
 
   @PostMapping("/bookings/{id}/quote")

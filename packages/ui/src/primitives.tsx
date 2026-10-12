@@ -227,18 +227,26 @@ export function Banner({ tone = 'info', icon, title, message, action }: { tone?:
   );
 }
 
-export function StatCard({ label, value, icon, tone = 'primary', hint, style }: { label: string; value: string; icon: IconName; tone?: Tone; hint?: string; style?: StyleProp<ViewStyle> }) {
+/** With `onPress` the whole card is a button that opens whatever the number counts. */
+export function StatCard({ label, value, icon, tone = 'primary', hint, style, onPress }: { label: string; value: string; icon: IconName; tone?: Tone; hint?: string; style?: StyleProp<ViewStyle>; onPress?: () => void }) {
   const t = toneColors[tone];
-  return (
-    <View style={[styles.card, styles.cardPad, styles.stat, style]}>
-      <View style={[styles.statIcon, { backgroundColor: t.bg }]}>
-        <Ionicons name={icon} size={18} color={t.fg} />
+  const body = (
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={[styles.statIcon, { backgroundColor: t.bg }]}>
+          <Ionicons name={icon} size={18} color={t.fg} />
+        </View>
+        {onPress ? <Ionicons name="chevron-forward" size={16} color={colors.subtle} /> : null}
       </View>
       <AppText variant="small" numberOfLines={1}>{label}</AppText>
       <AppText style={styles.statValue} numberOfLines={1}>{value}</AppText>
       {hint ? <AppText variant="tiny" numberOfLines={1}>{hint}</AppText> : null}
-    </View>
+    </>
   );
+  const s = [styles.card, styles.cardPad, styles.stat, style];
+  return onPress
+    ? <PressableScale onPress={onPress} hoverLift accessibilityRole="button" accessibilityLabel={`${label}: ${value}`} style={s}>{body}</PressableScale>
+    : <View style={s}>{body}</View>;
 }
 
 /** Label/value line used in summaries and invoices. */

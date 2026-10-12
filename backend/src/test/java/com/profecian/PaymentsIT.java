@@ -91,12 +91,13 @@ class PaymentsIT extends IntegrationTestBase {
   void outboxWorkerDeliversPendingMessages() {
     String token = customerToken(CUSTOMER_PHONE);
     newBooking(token);
-    assertThat(outbox.countByStatus("pending")).isPositive();
+    assertThat(outbox.countDue()).isPositive();
     int handled;
     do {
       handled = tx.execute(s -> worker.deliverBatch());
     } while (handled > 0);
-    assertThat(outbox.countByStatus("pending")).isZero();
+    // Everything due is delivered; messages about a vendor step still inside its undo window stay queued.
+    assertThat(outbox.countDue()).isZero();
     assertThat(outbox.countByStatus("sent")).isPositive();
   }
 

@@ -2,23 +2,25 @@ import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { View } from 'react-native';
 import {
-  BOOKING_STATUS, can, dailySeries, formatDate, formatINR, formatINRCompact, kpis, timeAgo, VENDOR_STATUS, inspectionNeedsAttention, } from '@profecian/shared';
+  BOOKING_STATUS, can, dailySeries, formatDate, formatINR, formatINRCompact, kpis, releaseAttention, timeAgo, VENDOR_STATUS, inspectionNeedsAttention, } from '@profecian/shared';
 import { AppText, Badge, Button, colors, LineChart, spacing, StatCard } from '@profecian/ui';
 import { Cell, DataTable, Page, Panel, Row, useAdmin } from '@/components/admin';
-import { useLookups } from '@/components/lookups';
+import { useScopedLookups } from '@/components/lookups';
 
 export default function Dashboard() {
-  const { db, serviceLabel } = useLookups();
+  const { db, serviceLabel, city } = useScopedLookups();
   const admin = useAdmin();
   const k = useMemo(() => kpis(db), [db]);
   const series = useMemo(() => dailySeries(db, 30), [db]);
   const pending = db.bookings.filter((b) => b.status === 'pending_assignment');
   const pendingVendors = db.vendors.filter((v) => v.status === 'pending');
   const inbox = db.notifications.filter((n) => n.audience === 'admin').slice(0, 6);
+  // Jobs given back by a professional, and on-site problems waiting for a decision.
+  const attention = useMemo(() => releaseAttention(db.bookings), [db.bookings]);
   const showMoney = can(admin, 'payments') || can(admin, 'analytics');
 
   return (
-    <Page title={`Good day, ${admin?.name.split(' ')[0]}`} subtitle="Here's what's happening across Profecian today." permission="dashboard">
+    <Page title={`Good day, ${admin?.name.split(' ')[0]}`} subtitle={city ? `Here's what's happening in ${city} today.` : "Here's what's happening across Profecian today."} permission="dashboard" cityFilter>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
         <StatCard label="Total users" value={String(k.totalUsers)} icon="people-outline" />
         <StatCard label="Total vendors" value={String(k.totalVendors)} icon="construct-outline" tone="info" hint={`${k.approvedVendors} approved · ${k.pendingVendors} pending`} />
@@ -41,8 +43,17 @@ export default function Dashboard() {
         ) : null}
         <Panel title="Needs attention">
           <View style={{ gap: spacing.md }}>
+            {attention.urgent.length ? (
+              <Attention icon="flame-outline" tone="danger" label={`${attention.urgent.length} urgent — released close to the slot`} action="Assign now" onPress={() => router.navigate('/assign')} />
+            ) : null}
+            {attention.released.length ? (
+              <Attention icon="swap-horizontal-outline" tone="warning" label={`${attention.released.length} released by a professional — need a new one`} action="Assign" onPress={() => router.navigate('/assign')} />
+            ) : null}
+            {attention.issues.length ? (
+              <Attention icon="alert-circle-outline" tone="danger" label={attention.issues.length === 1 ? '1 on-site problem needs a decision' : `${attention.issues.length} on-site problems need a decision`} action="Decide" onPress={() => router.navigate(attention.issues.length === 1 ? `/bookings/${attention.issues[0].id}` as never : '/bookings?filter=attention' as never)} />
+            ) : null}
             <Attention icon="hourglass-outline" tone="warning" label={`${pending.length} bookings waiting for a professional`} action="Assign" onPress={() => router.navigate('/assign')} />
-            <Attention icon="help-circle-outline" tone="warning" label={`${db.bookings.filter(inspectionNeedsAttention).length} “Not sure” requests need follow-up`} action="Review" onPress={() => router.navigate('/bookings?filter=not_sure' as never)} />
+            <Attention icon="help-circle-outline" tone="warning" label={`${db.bookings.filter(inspectionNeedsAttention).length} “Not sure” requests and quotes need follow-up`} action="Review" onPress={() => router.navigate('/bookings?filter=not_sure' as never)} />
             <Attention icon="shield-outline" tone="info" label={`${pendingVendors.length} vendors pending KYC approval`} action="Review" onPress={() => router.navigate('/vendors')} />
             <Attention icon="alert-circle-outline" tone="danger" label={`${k.openComplaints} open complaints`} action="Open" onPress={() => router.navigate('/reviews')} />
             <Attention icon="card-outline" tone="danger" label={`${db.bookings.filter((b) => b.payment.status === 'failed').length} failed payments`} action="View" onPress={() => router.navigate('/payments')} />
@@ -96,7 +107,7 @@ export default function Dashboard() {
   );
 }
 
-function Attention({ icon, tone, label, action, onPress }: { icon: 'hourglass-outline' | 'help-circle-outline' | 'shield-outline' | 'alert-circle-outline' | 'card-outline'; tone: 'warning' | 'info' | 'danger'; label: string; action: string; onPress: () => void }) {
+function Attention({ icon, tone, label, action, onPress }: { icon: 'hourglass-outline' | 'help-circle-outline' | 'shield-outline' | 'alert-circle-outline' | 'card-outline' | 'flame-outline' | 'swap-horizontal-outline'; tone: 'warning' | 'info' | 'danger'; label: string; action: string; onPress: () => void }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
       <Badge label="" tone={tone} icon={icon} />

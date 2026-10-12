@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View } from 'react-native';
-import { formatINR, useAction, useBackend, type Booking } from '@profecian/shared';
+import { formatINR, isNotSure, itemsAmount, useAction, useBackend, type Booking } from '@profecian/shared';
 import { AppText, Banner, Button, IconButton, KeyValue, Sheet, spacing, TextField } from '@profecian/ui';
 
 interface Row {
@@ -8,10 +8,13 @@ interface Row {
   amount: string;
 }
 
-/** Itemised repair quote after inspecting a "Not sure" job. The customer approves it before any repair. */
+/**
+ * An itemised quote the customer approves before the work is done: the repair quote after
+ * inspecting a "Not sure" job, or a quote for extra work found on a normal job.
+ */
 export function QuoteSheet({ visible, onClose, job, vendorId }: { visible: boolean; onClose: () => void; job: Booking; vendorId: string }) {
   return (
-    <Sheet visible={visible} onClose={onClose} title="Share repair quote" width={560}>
+    <Sheet visible={visible} onClose={onClose} title="Share quote" width={560}>
       {visible ? <QuoteForm job={job} vendorId={vendorId} onDone={onClose} /> : null}
     </Sheet>
   );
@@ -24,6 +27,8 @@ function QuoteForm({ job, vendorId, onDone }: { job: Booking; vendorId: string; 
   const [note, setNote] = useState('');
   const total = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
   const fee = job.inspection?.fee ?? 0;
+  // A normal job: this quote is for work on top of what was booked.
+  const extra = !isNotSure(job);
 
   const update = (index: number, patch: Partial<Row>) => setRows((all) => all.map((r, i) => (i === index ? { ...r, ...patch } : r)));
 
@@ -35,13 +40,15 @@ function QuoteForm({ job, vendorId, onDone }: { job: Booking; vendorId: string; 
   return (
     <View style={{ gap: spacing.lg }}>
       <AppText variant="small">
-        List what needs fixing and the price of each item (parts + labour, before GST). The customer approves it in the app before you start the repair.
+        {extra
+          ? 'List the extra work you found and the price of each item (parts + labour, before GST). The customer approves it in the app before you do it — carry on with the booked work meanwhile.'
+          : 'List what needs fixing and the price of each item (parts + labour, before GST). The customer approves it in the app before you start the repair.'}
       </AppText>
       {share.error ? <Banner tone="danger" icon="alert-circle" title={share.error} /> : null}
       {rows.map((r, i) => (
         <View key={i} style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-end' }}>
           <View style={{ flex: 1 }}>
-            <TextField label={`Item ${i + 1}`} placeholder="e.g. Replace fan capacitor" value={r.description} onChangeText={(t) => update(i, { description: t })} maxLength={80} />
+            <TextField label={`Item ${i + 1}`} placeholder={extra ? 'e.g. Replace regulator' : 'e.g. Replace fan capacitor'} value={r.description} onChangeText={(t) => update(i, { description: t })} maxLength={80} />
           </View>
           <View style={{ width: 110 }}>
             <TextField label="₹" placeholder="0" keyboardType="number-pad" value={r.amount} onChangeText={(t) => update(i, { amount: t.replace(/\D/g, '').slice(0, 6) })} />
@@ -53,7 +60,11 @@ function QuoteForm({ job, vendorId, onDone }: { job: Booking; vendorId: string; 
       <TextField label="Note for the customer" optional placeholder="e.g. Parts included, takes about 40 minutes" value={note} onChangeText={setNote} multiline maxLength={200} />
       <View style={{ gap: 2 }}>
         <KeyValue label="Quote total (before GST)" value={formatINR(total)} strong />
-        <AppText variant="small">If approved it replaces the {formatINR(fee)} inspection fee. If declined, the customer pays only the inspection fee.</AppText>
+        <AppText variant="small">
+          {extra
+            ? `If approved it is added to the ${formatINR(itemsAmount(job))} already booked. If declined, you complete only the booked work.`
+            : `If approved it replaces the ${formatINR(fee)} inspection fee. If declined, the customer pays only the inspection fee.`}
+        </AppText>
       </View>
       <Button label="Send quote to customer" icon="send" fullWidth loading={share.pending} onPress={submit} />
     </View>

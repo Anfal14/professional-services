@@ -1,11 +1,15 @@
 import { router } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { View } from 'react-native';
-import { bySchedule, formatINR, isActive, toISODate, useBackend, useDb } from '@profecian/shared';
+import { toISODate, useBackend, useDb, type Booking } from '@profecian/shared';
 import { AppText, Banner, Card, colors, EmptyState, IconButton, SectionTitle, spacing, StatCard, Toggle } from '@profecian/ui';
 import { useVendor } from '@/backend';
 import { JobCard } from '@/components/JobCard';
 import { VendorScreen } from '@/components/VendorScreen';
+import { groupJobs, type JobFilter } from '@/jobGroups';
+
+/** How many upcoming jobs the home screen lists before "See all". */
+const UPCOMING_SHOWN = 3;
 
 export default function Dashboard() {
   const vendor = useVendor()!;
@@ -13,12 +17,11 @@ export default function Dashboard() {
   const backend = useBackend();
   const today = toISODate(new Date());
   const mine = useMemo(() => db.bookings.filter((b) => b.vendorId === vendor.id), [db.bookings, vendor.id]);
-  const newJobs = mine.filter((b) => b.status === 'assigned');
-  const todays = mine.filter((b) => b.date === today && isActive(b.status) && b.status !== 'assigned').sort(bySchedule);
-  const upcoming = mine.filter((b) => b.date > today && isActive(b.status) && b.status !== 'assigned').sort(bySchedule);
-  const wallet = backend.wallet(vendor.id);
+  const jobs = useMemo(() => groupJobs(mine, today), [mine, today]);
   const unread = db.notifications.filter((n) => n.audience === 'vendor' && n.recipientId === vendor.id && !n.read).length;
   const hour = new Date().getHours();
+  const open = (filter: JobFilter) => () => router.push({ pathname: '/jobs', params: { filter } });
+  const nothingOpen = !jobs.in_progress.length && !jobs.upcoming.length && !jobs.new.length;
 
   return (
     <VendorScreen
@@ -35,35 +38,48 @@ export default function Dashboard() {
         <Toggle label="Availability" value={vendor.available} onChange={(v) => backend.vendor.updateProfile(vendor.id, { available: v })} />
       </Card>
 
+      {/* Each card opens the list it counts. Earnings live on the Earnings tab. */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
-        <StatCard label="Today's jobs" value={String(todays.length)} icon="today-outline" style={{ minWidth: 140 }} />
-        <StatCard label="Upcoming" value={String(upcoming.length)} icon="calendar-outline" tone="info" style={{ minWidth: 140 }} />
-        <StatCard label="Net earnings" value={formatINR(wallet.netEarnings)} icon="wallet-outline" tone="success" style={{ minWidth: 140 }} />
-        <StatCard label="Completed" value={String(wallet.completedJobs)} icon="checkmark-done-outline" tone="success" style={{ minWidth: 140 }} />
-        <StatCard label="Rating" value={vendor.rating ? `★ ${vendor.rating}` : 'New'} icon="star-outline" tone="warning" hint={`${vendor.ratingCount} reviews`} style={{ minWidth: 140 }} />
+        <StatCard label="Today's jobs" value={String(jobs.today.length)} icon="today-outline" style={{ minWidth: 140 }} onPress={open('today')} />
+        <StatCard label="Upcoming" value={String(jobs.upcoming.length)} icon="calendar-outline" tone="info" style={{ minWidth: 140 }} onPress={open('upcoming')} />
+        <StatCard label="Completed" value={String(jobs.completed.length)} icon="checkmark-done-outline" tone="success" style={{ minWidth: 140 }} onPress={open('completed')} />
+        <StatCard label="Rating" value={vendor.rating ? `★ ${vendor.rating}` : 'New'} icon="star-outline" tone="warning" hint={`${vendor.ratingCount} reviews`} style={{ minWidth: 140 }} onPress={() => router.push('/reviews')} />
       </View>
 
-      {newJobs.length ? (
-        <View>
-          <SectionTitle title={`New assignments (${newJobs.length})`} action="All jobs" onAction={() => router.push('/jobs')} />
-          <Banner tone="warning" icon="flash-outline" title="Accept new jobs quickly" message="Unaccepted jobs may be reassigned to another professional." />
-          <View style={{ gap: spacing.md, marginTop: spacing.md }}>{newJobs.map((j) => <JobCard key={j.id} job={j} />)}</View>
-        </View>
+      {jobs.in_progress.length ? (
+        <Section title={`In progress (${jobs.in_progress.length})`} jobs={jobs.in_progress} />
       ) : null}
 
-      <View>
-        <SectionTitle title="Today's schedule" />
-        {todays.length ? <View style={{ gap: spacing.md }}>{todays.map((j) => <JobCard key={j.id} job={j} />)}</View> : (
-          <Card><EmptyState icon="cafe-outline" title="No jobs today" message={vendor.available ? 'New assignments will appear here.' : 'Go online to start receiving jobs.'} /></Card>
-        )}
-      </View>
+      {jobs.upcoming.length ? (
+        <Section
+          title={`Upcoming (${jobs.upcoming.length})`}
+          jobs={jobs.upcoming.slice(0, UPCOMING_SHOWN)}
+          action={jobs.upcoming.length > UPCOMING_SHOWN ? 'See all' : undefined}
+          onAction={open('upcoming')}
+        />
+      ) : null}
 
-      {upcoming.length ? (
-        <View>
-          <SectionTitle title="Upcoming" action="See all" onAction={() => router.push('/jobs')} />
-          <View style={{ gap: spacing.md }}>{upcoming.slice(0, 3).map((j) => <JobCard key={j.id} job={j} />)}</View>
-        </View>
+      {jobs.new.length ? (
+        <Section title={`Assigned (${jobs.new.length})`} jobs={jobs.new}>
+          <Banner tone="warning" icon="flash-outline" title="Accept new jobs quickly" message="Unaccepted jobs may be reassigned to another professional." />
+        </Section>
+      ) : null}
+
+      {nothingOpen ? (
+        <Card><EmptyState icon="cafe-outline" title="No open jobs" message={vendor.available ? 'New assignments will appear here.' : 'Go online to start receiving jobs.'} /></Card>
       ) : null}
     </VendorScreen>
+  );
+}
+
+function Section({ title, jobs, action, onAction, children }: { title: string; jobs: Booking[]; action?: string; onAction?: () => void; children?: ReactNode }) {
+  return (
+    <View>
+      <SectionTitle title={title} action={action} onAction={onAction} />
+      <View style={{ gap: spacing.md }}>
+        {children}
+        {jobs.map((j) => <JobCard key={j.id} job={j} />)}
+      </View>
+    </View>
   );
 }

@@ -53,6 +53,10 @@ public class Notification {
     List<Notification> findByAudienceOrderByCreatedAtDesc(String audience);
 
     @Modifying
+    @Query("delete from Notification n where n.bookingId = :bookingId and n.createdAt >= :since and n.kind in :kinds")
+    int deleteByBookingSince(@Param("bookingId") String bookingId, @Param("since") java.time.Instant since, @Param("kinds") List<String> kinds);
+
+    @Modifying
     @Query("update Notification n set n.read = true where n.audience = :audience and n.recipientId = :recipientId and (:all = true or n.id in :ids)")
     int markRead(@Param("audience") String audience, @Param("recipientId") String recipientId, @Param("all") boolean all, @Param("ids") List<String> ids);
   }

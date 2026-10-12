@@ -11,6 +11,7 @@ import com.profecian.customers.CustomerService;
 import com.profecian.payments.LedgerEntry;
 import com.profecian.payouts.PayoutService;
 import com.profecian.reviews.ModerationService;
+import com.profecian.settings.CityService;
 import com.profecian.settings.SettingsService;
 import com.profecian.sync.Api;
 import com.profecian.sync.ApiMapper;
@@ -58,12 +59,16 @@ public class AdminController {
   private final LedgerEntry.Repository ledger;
   private final ModerationService moderation;
   private final SettingsService settings;
+  private final CityService cities;
   private final AnalyticsService analytics;
   private final ApiMapper mapper;
+  private final com.profecian.bookings.ReliabilityService reliability;
 
   public AdminController(CustomerService customers, CustomerRepository customerRepo, VendorService vendors, VendorRepository vendorRepo, CatalogService catalog,
                          AdminBookingService bookings, BookingRepository bookingRepo, BookingCore core, VendorMatcher matcher, PayoutService payouts,
-                         LedgerEntry.Repository ledger, ModerationService moderation, SettingsService settings, AnalyticsService analytics, ApiMapper mapper) {
+                         LedgerEntry.Repository ledger, ModerationService moderation, SettingsService settings, CityService cities, AnalyticsService analytics, ApiMapper mapper,
+                         com.profecian.bookings.ReliabilityService reliability) {
+    this.reliability = reliability;
     this.customers = customers;
     this.customerRepo = customerRepo;
     this.vendors = vendors;
@@ -77,6 +82,7 @@ public class AdminController {
     this.ledger = ledger;
     this.moderation = moderation;
     this.settings = settings;
+    this.cities = cities;
     this.analytics = analytics;
     this.mapper = mapper;
   }
@@ -120,7 +126,9 @@ public class AdminController {
   @PreAuthorize("hasAuthority('PERM_vendors')")
   @Transactional(readOnly = true)
   public List<Api.Vendor> listVendors() {
-    return vendorRepo.findAllByOrderByJoinedAtDesc().stream().map(v -> mapper.vendor(v, true)).toList();
+    var stats = reliability.all();
+    return vendorRepo.findAllByOrderByJoinedAtDesc().stream()
+        .map(v -> mapper.vendor(v, true, stats.getOrDefault(v.id, com.profecian.bookings.ReliabilityService.Stats.NONE))).toList();
   }
 
   public record Decision(String decision, String reason) {}
@@ -164,6 +172,15 @@ public class AdminController {
     return catalog.saveProblemType(p);
   }
 
+  public record CityPrice(java.math.BigDecimal price) {}
+
+  /** Exact price of one problem in one city; a null price goes back to the city's price level. */
+  @PutMapping("/problem-types/{id}/city-prices/{city}")
+  @PreAuthorize("hasAuthority('PERM_services')")
+  public Api.ProblemType setCityPrice(@PathVariable String id, @PathVariable String city, @RequestBody CityPrice body) {
+    return catalog.setCityPrice(id, city, body.price());
+  }
+
   @DeleteMapping("/problem-types/{id}")
   @PreAuthorize("hasAuthority('PERM_services')")
   public ResponseEntity<Void> deleteProblemType(@PathVariable String id) {
@@ -179,7 +196,7 @@ public class AdminController {
   public Page<Api.Booking> listBookings(@RequestParam(required = false) String status, @RequestParam(required = false) String q,
                                         @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
     String like = q == null || q.isBlank() ? null : "%" + q.trim().toLowerCase() + "%";
-    return bookingRepo.search(status, like, PageRequest.of(page, Math.min(size, 200))).map(mapper::booking);
+    return bookingRepo.search(status, like, PageRequest.of(page, Math.min(size, 200))).map(mapper::bookingForAdmin);
   }
 
   @GetMapping("/bookings/{id}/suggestions")
@@ -192,7 +209,10 @@ public class AdminController {
 
   public record Status(String status, String note) {}
 
-  public record Question(String question) {}
+
+  public record Note(String note) {}
+
+  public record ReturnVisit(java.time.LocalDate date, String slot) {}
 
   public record QuoteAnswer(boolean approve, String note) {}
 
@@ -208,10 +228,16 @@ public class AdminController {
     return bookings.setStatus(id, s.status(), s.note());
   }
 
-  @PostMapping("/bookings/{id}/ask")
+  @PostMapping("/bookings/{id}/issue/resolve")
   @PreAuthorize("hasAuthority('PERM_bookings')")
-  public Api.Booking ask(@PathVariable String id, @RequestBody Question q) {
-    return bookings.askCustomer(id, q.question());
+  public Api.Booking resolveIssue(@PathVariable String id, @RequestBody Note n) {
+    return bookings.resolveIssue(id, n.note());
+  }
+
+  @PostMapping("/bookings/{id}/return-visit")
+  @PreAuthorize("hasAuthority('PERM_bookings')")
+  public Api.Booking returnVisit(@PathVariable String id, @RequestBody ReturnVisit r) {
+    return bookings.scheduleReturnVisit(id, r.date(), r.slot());
   }
 
   @PostMapping("/bookings/{id}/quote")
@@ -275,5 +301,26 @@ public class AdminController {
   @Transactional
   public Api.PlatformSettings updateSettings(@RequestBody SettingsService.Patch patch) {
     return mapper.settings(settings.update(patch), settings.cities());
+  }
+
+  /* ───── Cities ───── */
+
+  @PostMapping("/cities")
+  @PreAuthorize("hasAuthority('PERM_settings')")
+  public Api.City createCity(@RequestBody CityService.CityInput in) {
+    return mapper.city(cities.save(in, null));
+  }
+
+  @PutMapping("/cities/{name}")
+  @PreAuthorize("hasAuthority('PERM_settings')")
+  public Api.City updateCity(@PathVariable String name, @RequestBody CityService.CityInput in) {
+    return mapper.city(cities.save(in, name));
+  }
+
+  @DeleteMapping("/cities/{name}")
+  @PreAuthorize("hasAuthority('PERM_settings')")
+  public ResponseEntity<Void> deleteCity(@PathVariable String name) {
+    cities.delete(name);
+    return ResponseEntity.noContent().build();
   }
 }

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { PRICING_MODEL_LABEL, useAction, useBackend, useDb, type PricingModel, type ProblemType, type ServiceCategory } from '@profecian/shared';
+import { cityPrice, formatINR, PRICING_MODEL_LABEL, useAction, useBackend, useDb, type City, type PricingModel, type ProblemType, type ServiceCategory } from '@profecian/shared';
 import {
   AppText, asIcon, Banner, Button, ChipGroup, colors, FieldShell, PhotoPicker, radius, Sheet, spacing, TextField, Toggle,
 } from '@profecian/ui';
@@ -101,16 +101,30 @@ export function CategorySheet({ visible, onClose, initial }: { visible: boolean;
 
 type ProblemDraft = Omit<ProblemType, 'id'> & { id?: string };
 
-export function ProblemSheet({ visible, onClose, categoryId, initial }: { visible: boolean; onClose: () => void; categoryId: string; initial?: ProblemType }) {
+/** `city`: the city filter's city — adds a field for this problem's exact price there. */
+export function ProblemSheet({ visible, onClose, categoryId, initial, city }: { visible: boolean; onClose: () => void; categoryId: string; initial?: ProblemType; city?: City }) {
   const backend = useBackend();
   const [draft, setDraft] = useState<ProblemDraft>(initial ?? { categoryId, name: '', description: '', icon: 'construct-outline', price: 0, pricingModel: 'fixed', durationMins: 60, enabled: true });
   const [price, setPrice] = useState(initial ? String(initial.price) : '');
   const [duration, setDuration] = useState(String(initial?.durationMins ?? 60));
-  const save = useAction(backend.admin.saveProblemType);
+  // Empty = follow the city's price level.
+  const savedExact = city ? initial?.cityPrices?.[city.name] : undefined;
+  const [exact, setExact] = useState(savedExact != null ? String(savedExact) : '');
+  const save = useAction(async (input: ProblemDraft, exactPrice: number | null | undefined) => {
+    const saved = await backend.admin.saveProblemType(input);
+    // undefined = unchanged; null = back to the price level.
+    if (city && exactPrice !== undefined) return backend.admin.setCityPrice(saved.id, city.name, exactPrice);
+    return saved;
+  });
   const set = <K extends keyof ProblemDraft>(k: K, v: ProblemDraft[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
   const submit = async () => {
-    const ok = await save.run({ ...draft, price: Number(price), durationMins: Math.max(5, Number(duration) || 60) });
+    const typed = exact.trim() === '' ? null : Number(exact);
+    if (typed !== null && !(typed >= 0)) {
+      save.setError(`Enter a valid price for ${city?.name}`);
+      return;
+    }
+    const ok = await save.run({ ...draft, price: Number(price), durationMins: Math.max(5, Number(duration) || 60) }, typed === (savedExact ?? null) ? undefined : typed);
     if (ok) onClose();
   };
 
@@ -125,9 +139,20 @@ export function ProblemSheet({ visible, onClose, categoryId, initial }: { visibl
         <ChipGroup<PricingModel> value={draft.pricingModel} onChange={(v) => set('pricingModel', v)} options={(Object.keys(PRICING_MODEL_LABEL) as PricingModel[]).map((m) => ({ value: m, label: PRICING_MODEL_LABEL[m] }))} />
       </FieldShell>
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
-        <View style={{ flex: 1 }}><TextField label="Price (₹)" required keyboardType="numeric" value={price} onChangeText={setPrice} hint={draft.pricingModel === 'starting_at' ? 'Shown as "from ₹…"' : draft.pricingModel === 'inspection' ? 'Visit charge; final quote on site' : undefined} /></View>
+        <View style={{ flex: 1 }}><TextField label={city ? 'Base price (₹)' : 'Price (₹)'} required keyboardType="numeric" value={price} onChangeText={setPrice} hint={draft.pricingModel === 'starting_at' ? 'Shown as "from ₹…"' : draft.pricingModel === 'inspection' ? 'Visit charge; final quote on site' : undefined} /></View>
         <View style={{ flex: 1 }}><TextField label="Duration (mins)" keyboardType="numeric" value={duration} onChangeText={setDuration} /></View>
       </View>
+      {city ? (
+        <TextField
+          label={`Exact price in ${city.name} (₹)`}
+          optional
+          keyboardType="numeric"
+          value={exact}
+          onChangeText={setExact}
+          placeholder={Number(price) >= 0 && price !== '' ? `Price level: ${formatINR(cityPrice(Number(price), city.priceLevel))}` : 'Uses the price level'}
+          hint={`Leave empty to use ${city.name}’s price level (${city.priceLevel}% of the base price, rounded to end in 9). A price typed here is charged exactly as typed.`}
+        />
+      ) : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <Toggle label="Enabled" value={draft.enabled} onChange={(v) => set('enabled', v)} />
         <AppText variant="label">Enabled for customers</AppText>

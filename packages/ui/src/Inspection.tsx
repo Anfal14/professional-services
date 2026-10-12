@@ -7,12 +7,11 @@ import { AppText, Badge, Banner, Button, Card, Divider, TextField } from './prim
 import { Sheet } from './widgets';
 import { colors, createStyles, fonts, radius, spacing } from './theme';
 
-const AUTHOR: Record<Role, string> = { customer: 'Customer', vendor: 'Professional', admin: 'Support' };
-
 /**
- * Everything about an "Other / Not sure" request, the same for customer,
- * professional and support: what was asked for, what happens next, the
- * questions and answers, and the quote. Role-specific buttons go in `actions`.
+ * Everything about a booking's quote thread, the same for customer, professional and support:
+ * what was asked for, what happens next, and the quote. It is either an
+ * "Other / Not sure" request or a quote for extra work found on a normal booking. Role-specific
+ * buttons go in `actions`.
  */
 export function InspectionPanel({ booking, categoryName, audience, actions }: {
   booking: Booking;
@@ -25,18 +24,22 @@ export function InspectionPanel({ booking, categoryName, audience, actions }: {
   const status = INSPECTION_STATUS[i.status];
   const next = inspectionNextStep(booking, audience);
   const you = audience === 'customer' ? 'You' : 'Customer';
+  // Extra work found on site, on top of what was booked — not an inspection visit.
+  const extra = i.kind === 'extra_work';
 
   return (
     <Card style={{ gap: spacing.md }}>
       <View style={styles.head}>
         <View style={styles.icon}>
-          <Ionicons name="help-circle" size={20} color={colors.primary} />
+          <Ionicons name={extra ? 'add-circle' : 'help-circle'} size={20} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
-          <AppText variant="h3">“Other / Not sure”</AppText>
-          <AppText variant="small">{you} chose {categoryName ?? 'this service'} but not a specific problem</AppText>
+          <AppText variant="h3">{extra ? 'Quote for extra work' : '“Other / Not sure”'}</AppText>
+          <AppText variant="small">
+            {extra ? 'Found during the visit, on top of the booked work' : `${you} chose ${categoryName ?? 'this service'} but not a specific problem`}
+          </AppText>
         </View>
-        <Badge label={i.awaitingCustomer ? 'Waiting for customer' : status.label} tone={i.awaitingCustomer ? 'warning' : status.tone} />
+        <Badge label={status.label} tone={status.tone} />
       </View>
 
       {next ? (
@@ -46,6 +49,7 @@ export function InspectionPanel({ booking, categoryName, audience, actions }: {
         </View>
       ) : null}
 
+      {extra ? null : (
       <View style={{ gap: 4 }}>
         <AppText variant="tiny">{audience === 'customer' ? 'YOUR DESCRIPTION' : 'CUSTOMER’S DESCRIPTION'}</AppText>
         <AppText variant="body">{i.description}</AppText>
@@ -57,27 +61,12 @@ export function InspectionPanel({ booking, categoryName, audience, actions }: {
           </View>
         ) : null}
       </View>
+      )}
 
-      {i.messages.length ? (
-        <View style={{ gap: spacing.sm }}>
-          <AppText variant="tiny">QUESTIONS & ANSWERS</AppText>
-          {i.messages.map((m) => {
-            const mine = m.from === audience;
-            return (
-              <View key={m.id} style={[styles.msg, mine ? styles.msgMine : m.from === 'customer' ? styles.msgCustomer : null]}>
-                <AppText variant="tiny">
-                  {mine ? 'You' : `${AUTHOR[m.from]} · ${m.authorName}`} · {formatDateTime(m.at)}
-                </AppText>
-                <AppText variant="body">{m.text}</AppText>
-              </View>
-            );
-          })}
-        </View>
-      ) : null}
 
       {i.quote ? (
         <View style={styles.quote}>
-          <AppText variant="label">{i.status === 'approved' ? 'Approved quote' : i.status === 'declined' ? 'Declined quote' : 'Repair quote'}</AppText>
+          <AppText variant="label">{i.status === 'approved' ? 'Approved quote' : i.status === 'declined' ? 'Declined quote' : extra ? 'Extra work quote' : 'Repair quote'}</AppText>
           {i.quote.lines.map((l, n) => (
             <View key={n} style={styles.line}>
               <AppText variant="body" style={{ flex: 1 }}>{l.description}</AppText>
@@ -91,11 +80,11 @@ export function InspectionPanel({ booking, categoryName, audience, actions }: {
           </View>
           {i.quote.note ? <AppText variant="small">“{i.quote.note}”</AppText> : null}
           <AppText variant="small">
-            Replaces the {formatINR(i.fee)} inspection fee if approved.
+            {extra ? 'Added to the booked work if approved; the booked work goes ahead either way.' : `Replaces the ${formatINR(i.fee)} inspection fee if approved.`}
             {i.quote.respondedAt ? ` ${i.status === 'approved' ? 'Approved' : 'Declined'} ${formatDateTime(i.quote.respondedAt)}${i.quote.respondedBy === 'admin' ? ' via support' : ''}.` : ''}
           </AppText>
         </View>
-      ) : (
+      ) : extra ? null : (
         <AppText variant="small">Inspection fee {formatINR(i.fee)} + GST — replaced by the repair quote if one is approved.</AppText>
       )}
 
@@ -117,16 +106,13 @@ const styles = createStyles(() => ({
   next: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.primarySoft },
   photos: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: 4 },
   photo: { width: 72, height: 72, borderRadius: radius.md, backgroundColor: colors.background },
-  msg: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border, gap: 2 },
-  msgMine: { backgroundColor: colors.selectedBg, borderColor: colors.primaryBorder },
-  msgCustomer: { backgroundColor: colors.successSoft, borderColor: colors.successSoft },
   quote: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.primaryBorder },
   line: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   total: { fontFamily: fonts.extrabold, fontSize: 17, color: colors.ink },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 }));
 
-/** Small sheet to write one message — a question, an answer, or a note — with validation and error display. */
+/** Small sheet to write one short note, with validation and error display. */
 export function ComposeSheet({ visible, onClose, title, label, placeholder, submitLabel, hint, minLength = 2, onSubmit }: {
   visible: boolean;
   onClose: () => void;

@@ -4,11 +4,11 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Linking, View } from 'react-native';
 import {
-  bookingProblemLabel, bookingProblemNames, BOOKING_STATUS, canCustomerModify, canQuote, isQuoteOpen, isSlotAvailable, formatDate, formatDateTime, formatINR, formatPhone, ONLINE_METHODS, PAYMENT_METHOD_LABEL, PAYMENT_STATUS,
-  suggestVendors, TRACKING_STEPS, useAction, useBackend, useDb, VENDOR_NEXT, type Booking, type PaymentMethod,
+  afterPhotosOf, awaitingAfterRelease, bookingProblemLabel, isExtraWork, itemsAmount, bookingProblemNames, BOOKING_STATUS, canCustomerModify, canQuote, isQuoteOpen, isSlotAvailable, formatDate, formatDateTime, formatINR, formatPhone, ONLINE_METHODS, PAYMENT_METHOD_LABEL, PAYMENT_STATUS,
+  suggestVendors, TRACKING_STEPS, useAction, useBackend, useDb, VENDOR_NEXT, type Booking, type BookingEvent, type PaymentMethod,
 } from '@profecian/shared';
 import {
-  asIcon, Banner, hasOpenSlots, Button as UiButton, Card, ChipGroup, DateSlotPicker, Divider, KeyValue, PhotoPicker, Sheet, StarInput, Stars, TextField, Timeline, Toggle, ComposeSheet, confirmAction, InspectionPanel } from '@profecian/ui';
+  asIcon, Banner, hasOpenSlots, Button as UiButton, Card, ChipGroup, DateSlotPicker, Divider, KeyValue, PhotoPicker, Sheet, StarInput, Stars, TextField, Timeline, Toggle, confirmAction, InspectionPanel } from '@profecian/ui';
 import { AppText } from '@/components/AppText';
 import { Container } from '@/components/Container';
 import { EmptyState } from '@/components/EmptyState';
@@ -32,6 +32,19 @@ const STEP_LABEL: Record<string, string> = {
 
 const CANCEL_REASONS = ['Plans changed', 'Booked by mistake', 'Found another professional', 'Price too high', 'Other'];
 
+/**
+ * The booking's history as the customer should see it: a release shows without the professional's
+ * reason, and on-site reports to our team (and their resolution) are left out.
+ */
+function customerTimeline(events: BookingEvent[]): BookingEvent[] {
+  return events
+    .filter((e) => e.kind !== 'issue_reported' && e.kind !== 'issue_resolved')
+    .map((e) => (e.kind === 'released' ? { ...e, note: undefined } : e));
+}
+
+/** Stand-in "after" photo for the mock's "Simulate next update" button. */
+const DEMO_AFTER_PHOTO = 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=600&q=70';
+
 export default function BookingDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const customer = useCustomer();
@@ -39,7 +52,7 @@ export default function BookingDetail() {
   const { isDesktop, isMobile } = useResponsive();
   const { getService } = useCatalog();
   const booking = db.bookings.find((b) => b.id === id && b.customerId === customer?.id);
-  const [sheet, setSheet] = useState<'pay' | 'reschedule' | 'cancel' | 'complaint' | 'reply' | null>(null);
+  const [sheet, setSheet] = useState<'pay' | 'reschedule' | 'cancel' | 'complaint' | null>(null);
   const backend = useBackend();
   const quote = useAction(backend.customer.respondToQuote);
 
@@ -64,11 +77,17 @@ export default function BookingDetail() {
 
   const answerQuote = async (approve: boolean) => {
     const amount = booking.inspection?.quote?.amount ?? 0;
+    // Extra work is on top of the booking; a "Not sure" quote replaces the inspection fee.
+    const extra = isExtraWork(booking);
     const ok = await confirmAction(
-      approve ? 'Approve repair quote?' : 'Decline repair quote?',
-      approve
-        ? `The professional will go ahead with the repair for ${formatINR(amount)} + GST. It replaces the inspection fee.`
-        : `No repair will be done. You pay only the ${formatINR(booking.inspection?.fee ?? 0)} inspection fee + GST.`,
+      approve ? (extra ? 'Approve the extra work?' : 'Approve repair quote?') : (extra ? 'Decline the extra work?' : 'Decline repair quote?'),
+      extra
+        ? approve
+          ? `The professional will also do the extra work for ${formatINR(amount)} + GST, on top of the ${formatINR(itemsAmount(booking))} you booked.`
+          : `Only the work you booked (${formatINR(itemsAmount(booking))} + GST) will be done. The extra work won’t be.`
+        : approve
+          ? `The professional will go ahead with the repair for ${formatINR(amount)} + GST. It replaces the inspection fee.`
+          : `No repair will be done. You pay only the ${formatINR(booking.inspection?.fee ?? 0)} inspection fee + GST.`,
       approve ? 'Approve' : 'Decline',
     );
     if (ok) await quote.run(customer.id, booking.id, approve);
@@ -91,12 +110,27 @@ export default function BookingDetail() {
                   <UiButton label="Decline" icon="close-circle-outline" size="sm" variant="outline" loading={quote.pending} onPress={() => answerQuote(false)} />
                 </>
               ) : null}
-              {booking.inspection.awaitingCustomer ? (
-                <UiButton label="Reply" icon="chatbubble-ellipses-outline" size="sm" onPress={() => setSheet('reply')} />
-              ) : null}
             </>
           )}
         />
+      ) : null}
+      {booking.status === 'arrived' && booking.startCode ? (
+        <Card style={{ gap: spacing.md, borderColor: colors.primary, borderWidth: 1.5 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <Ionicons name="key-outline" size={20} color={colors.primary} />
+            <AppText variant="h3" style={{ flex: 1 }}>Start code</AppText>
+          </View>
+          <View style={styles.codeRow} accessibilityRole="text" accessibilityLabel={`Start code ${booking.startCode.split('').join(' ')}`}>
+            {booking.startCode.split('').map((digit, i) => (
+              <View key={i} style={styles.codeDigit}>
+                <AppText style={styles.codeText}>{digit}</AppText>
+              </View>
+            ))}
+          </View>
+          <AppText variant="small">
+            {vendor ? vendor.name.split(' ')[0] : 'Your professional'} has arrived. Tell them this code at your door — they need it to start the service. Don’t share it over a call or message.
+          </AppText>
+        </Card>
       ) : null}
       {vendor && !cancelled ? (
         <Card style={{ gap: spacing.md }}>
@@ -185,7 +219,7 @@ export default function BookingDetail() {
 
       <Card style={{ gap: spacing.md }}>
         <AppText variant="h3">Activity</AppText>
-        <Timeline events={booking.timeline} />
+        <Timeline events={customerTimeline(booking.timeline)} labels={{ released: 'Finding another professional' }} />
       </Card>
     </View>
   );
@@ -215,16 +249,6 @@ export default function BookingDetail() {
       {sheet === 'reschedule' ? <RescheduleSheet booking={booking} onClose={() => setSheet(null)} /> : null}
       {sheet === 'cancel' ? <CancelSheet booking={booking} onClose={() => setSheet(null)} /> : null}
       {sheet === 'complaint' ? <ComplaintSheet booking={booking} onClose={() => setSheet(null)} /> : null}
-      <ComposeSheet
-        visible={sheet === 'reply'}
-        onClose={() => setSheet(null)}
-        title="Reply"
-        label="Your answer"
-        placeholder="Type your answer"
-        hint="Shared with your professional and our support team."
-        submitLabel="Send reply"
-        onSubmit={(text) => backend.customer.answerClarification(customer.id, booking.id, text)}
-      />
     </Screen>
   );
 }
@@ -251,7 +275,8 @@ function LiveStatus({ booking }: { booking: Booking }) {
   const idx = TRACKING_STEPS.indexOf(booking.status);
   const meta = BOOKING_STATUS[booking.status];
   const headline: Record<string, string> = {
-    pending_assignment: 'Finding the best professional near you',
+    // After a release the tracker is back at the first step: say why, and that the slot is safe.
+    pending_assignment: awaitingAfterRelease(booking) ? 'Your professional couldn’t make it — we’re finding another one. Your slot stays the same.' : 'Finding the best professional near you',
     assigned: 'A professional has been assigned',
     accepted: 'Your professional confirmed the visit',
     on_the_way: 'Your professional is on the way',
@@ -272,7 +297,15 @@ function LiveStatus({ booking }: { booking: Booking }) {
         const fee = booking.inspection?.fee ?? 0;
         await backend.vendor.shareQuote(booking.vendorId, booking.id, [{ description: 'Repair as found during inspection (demo quote)', amount: fee * 3 }], 'Demo quote');
       } else if (booking.vendorId && VENDOR_NEXT[booking.status] && !(VENDOR_NEXT[booking.status] === 'completed' && isQuoteOpen(booking))) {
-        await backend.vendor.advanceJob(booking.vendorId, booking.id);
+        const next = VENDOR_NEXT[booking.status];
+        // The professional needs an "after" photo to complete, and the start code to begin.
+        if (next === 'completed' && !afterPhotosOf(booking).length) await backend.vendor.addProofPhoto(booking.vendorId, booking.id, DEMO_AFTER_PHOTO, 'after');
+        try {
+          await backend.vendor.advanceJob(booking.vendorId, booking.id, { startCode: booking.startCode });
+        } catch {
+          // e.g. the demo professional already has a job in progress — support starts this one instead.
+          if (next) await backend.admin.setBookingStatus(booking.id, next);
+        }
       }
     } catch {
       // Demo control only — the real flows show their own errors.
@@ -459,6 +492,9 @@ function ComplaintSheet({ booking, onClose }: { booking: Booking; onClose: () =>
 }
 
 const styles = createStyles(() => ({
+  codeRow: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
+  codeDigit: { width: 54, height: 64, borderRadius: radius.lg, backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primaryBorder, alignItems: 'center', justifyContent: 'center' },
+  codeText: { fontFamily: fonts.extrabold, fontSize: 30, color: colors.primary },
   page: { paddingTop: spacing.xxl, gap: spacing.xl, maxWidth: 1100 },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, flexWrap: 'wrap' },
   headImg: { width: 72, height: 72, borderRadius: radius.lg },

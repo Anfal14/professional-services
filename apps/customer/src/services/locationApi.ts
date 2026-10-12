@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { Platform } from 'react-native';
-import { nearestCity } from '@profecian/shared';
-import { DEFAULT_CITY, isCity } from '@/data/locations';
+import { findCity, nearestCity, type City } from '@profecian/shared';
+import { DEFAULT_CITY } from '@/data/locations';
 
 /**
  * Location persistence + device location — on-device only, no backend yet.
@@ -39,7 +39,7 @@ export async function fetchSelection(): Promise<LocationSelection> {
       if (isSelection(parsed)) return parsed;
     }
     const legacy = await AsyncStorage.getItem(LEGACY_KEY);
-    return legacy && isCity(legacy) ? { kind: 'city', city: legacy } : DEFAULT_SELECTION;
+    return legacy ? { kind: 'city', city: legacy } : DEFAULT_SELECTION;
   } catch {
     return DEFAULT_SELECTION;
   }
@@ -52,11 +52,11 @@ export async function saveSelection(selection: LocationSelection): Promise<void>
 export class LocationError extends Error {}
 
 /**
- * Asks for permission, reads the device position and turns it into a served
- * city + a readable area. Reverse geocoding is native-only, so on web the area
- * is the pinned coordinate and the city is the nearest one we serve.
+ * Asks for permission, reads the device position and turns it into one of `cities` (the live ones)
+ * + a readable area. The position must be inside that city's service radius. Reverse geocoding is
+ * native-only, so on web the area is the pinned coordinate.
  */
-export async function detectCurrentLocation(): Promise<CurrentLocation> {
+export async function detectCurrentLocation(cities: City[]): Promise<CurrentLocation> {
   const perm = await Location.requestForegroundPermissionsAsync().catch(() => null);
   if (!perm || perm.status !== 'granted') {
     throw new LocationError('Location access is off. Allow it in your browser or device settings, or add your address manually.');
@@ -68,14 +68,20 @@ export async function detectCurrentLocation(): Promise<CurrentLocation> {
     throw new LocationError('We couldn’t get your location. Check that location services are on and try again.');
   }
   const { latitude: lat, longitude: lng } = pos.coords;
-  let city = nearestCity(lat, lng).city;
+  const nearest = nearestCity(cities, lat, lng);
+  if (!nearest?.inside) {
+    const list = cities.map((c) => c.name).join(', ');
+    throw new LocationError(list ? `We don’t serve your area yet. Profecian is available in ${list}.` : 'We don’t serve your area yet.');
+  }
+  let city = nearest.city.name;
   let area = '';
   if (Platform.OS !== 'web') {
     try {
       const [g] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
       if (g) {
         area = [g.name, g.street, g.district ?? g.subregion].filter((x, i, all): x is string => !!x && all.indexOf(x) === i).join(', ');
-        if (g.city && isCity(g.city)) city = g.city;
+        const named = findCity({ cities }, g.city ?? undefined);
+        if (named) city = named.name;
       }
     } catch {
       // Fall back to the coordinate label below.

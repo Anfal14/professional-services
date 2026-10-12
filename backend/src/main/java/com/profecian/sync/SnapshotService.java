@@ -3,6 +3,7 @@ package com.profecian.sync;
 import com.profecian.admin.AdminUser;
 import com.profecian.auth.CurrentUser;
 import com.profecian.bookings.Booking;
+import com.profecian.bookings.ReliabilityService;
 import com.profecian.bookings.BookingRepository;
 import com.profecian.catalog.CatalogRepositories.CategoryRepository;
 import com.profecian.catalog.CatalogRepositories.ProblemTypeRepository;
@@ -32,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SnapshotService {
   /** Matches DB_VERSION in packages/shared/src/seed.ts. */
-  public static final int VERSION = 7;
+  public static final int VERSION = 13;
 
   private final CategoryRepository categories;
   private final ProblemTypeRepository problemTypes;
@@ -46,10 +47,12 @@ public class SnapshotService {
   private final Payout.Repository payouts;
   private final Notification.Repository notifications;
   private final ApiMapper mapper;
+  private final ReliabilityService reliability;
 
   public SnapshotService(CategoryRepository categories, ProblemTypeRepository problemTypes, SettingsService settings, CustomerRepository customers,
                          VendorRepository vendors, AdminUser.Repository admins, BookingRepository bookings, Review.Repository reviews,
-                         Complaint.Repository complaints, Payout.Repository payouts, Notification.Repository notifications, ApiMapper mapper) {
+                         Complaint.Repository complaints, Payout.Repository payouts, Notification.Repository notifications, ApiMapper mapper, ReliabilityService reliability) {
+    this.reliability = reliability;
     this.categories = categories;
     this.problemTypes = problemTypes;
     this.settings = settings;
@@ -62,6 +65,13 @@ public class SnapshotService {
     this.payouts = payouts;
     this.notifications = notifications;
     this.mapper = mapper;
+  }
+
+  /** Every vendor with the totals behind their completion rate, counted in one query. */
+  private List<Api.Vendor> vendorsWithReliability() {
+    var stats = reliability.all();
+    return vendors.findAllByOrderByJoinedAtDesc().stream()
+        .map(v -> mapper.vendor(v, true, stats.getOrDefault(v.id, ReliabilityService.Stats.NONE))).toList();
   }
 
   @Transactional(readOnly = true)
@@ -95,7 +105,7 @@ public class SnapshotService {
       }
       case "vendor" -> new Api.Database(VERSION, cats, problems, List.of(),
           vendors.findById(u.id()).map(v -> mapper.vendor(v, true)).stream().toList(), List.of(),
-          bookings.findByVendorIdOrderByCreatedAtDesc(u.id()).stream().map(mapper::booking).toList(),
+          bookings.findByVendorIdOrderByCreatedAtDesc(u.id()).stream().map(mapper::bookingForVendor).toList(),
           reviews.findByVendorIdOrderByCreatedAtDesc(u.id()).stream().map(mapper::review).toList(),
           List.of(),
           payouts.findByVendorIdOrderByCreatedAtDesc(u.id()).stream().map(mapper::payout).toList(),
@@ -103,9 +113,9 @@ public class SnapshotService {
           s);
       case "admin" -> new Api.Database(VERSION, cats, problems,
           customers.findAll().stream().map(mapper::customer).toList(),
-          vendors.findAllByOrderByJoinedAtDesc().stream().map(v -> mapper.vendor(v, true)).toList(),
+          vendorsWithReliability(),
           admins.findAll().stream().map(a -> new Api.AdminUser(a.id, a.name, a.email, a.role)).toList(),
-          bookings.findAllByOrderByCreatedAtDesc().stream().map(mapper::booking).toList(),
+          bookings.findAllByOrderByCreatedAtDesc().stream().map(mapper::bookingForAdmin).toList(),
           reviews.findAllByOrderByCreatedAtDesc().stream().map(mapper::review).toList(),
           complaints.findAllByOrderByCreatedAtDesc().stream().map(mapper::complaint).toList(),
           payouts.findAllByOrderByCreatedAtDesc().stream().map(mapper::payout).toList(),

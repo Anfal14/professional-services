@@ -4,12 +4,12 @@ import { View } from 'react-native';
 import { formatDateTime, formatINR, formatPhone, useAction, useBackend } from '@profecian/shared';
 import { Badge, Button, confirmAction, spacing } from '@profecian/ui';
 import { Cell, DataTable, Page, SearchInput, Tabs } from '@/components/admin';
-import { useLookups } from '@/components/lookups';
+import { useScopedLookups } from '@/components/lookups';
 
 type Filter = 'all' | 'active' | 'blocked';
 
 export default function Users() {
-  const { db } = useLookups();
+  const { db, allDb, city } = useScopedLookups();
   const backend = useBackend();
   const block = useAction(backend.admin.setCustomerBlocked);
   const [filter, setFilter] = useState<Filter>('all');
@@ -17,7 +17,7 @@ export default function Users() {
 
   const stats = useMemo(() => {
     const m = new Map<string, { count: number; spent: number; last?: string }>();
-    for (const b of db.bookings) {
+    for (const b of allDb.bookings) {
       const s = m.get(b.customerId) ?? { count: 0, spent: 0 };
       s.count += 1;
       if (b.payment.status === 'paid') s.spent += b.price.total;
@@ -25,7 +25,7 @@ export default function Users() {
       m.set(b.customerId, s);
     }
     return m;
-  }, [db.bookings]);
+  }, [allDb.bookings]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -40,7 +40,7 @@ export default function Users() {
   };
 
   return (
-    <Page title="Users" subtitle="Customers who have signed up on the app." permission="users">
+    <Page title="Users" subtitle={city ? `Customers who live or have booked in ${city}. Booking totals cover all cities.` : 'Customers who have signed up on the app.'} permission="users" cityFilter>
       <View style={{ gap: spacing.md }}>
         <SearchInput value={q} onChange={setQ} placeholder="Search name, phone, email or city" />
         <Tabs value={filter} onChange={setFilter} tabs={[

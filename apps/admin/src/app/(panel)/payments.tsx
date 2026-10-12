@@ -7,12 +7,12 @@ import {
 } from '@profecian/shared';
 import { AppText, Badge, Banner, BarList, Button, confirmAction, spacing, StatCard } from '@profecian/ui';
 import { Cell, DataTable, Page, Panel, Row, SearchInput, Tabs } from '@/components/admin';
-import { useLookups } from '@/components/lookups';
+import { useScopedLookups } from '@/components/lookups';
 
 type Tab = 'payments' | 'payouts' | 'settlements' | 'reports';
 
 export default function Payments() {
-  const { db, serviceLabel, vendorName } = useLookups();
+  const { db, allDb, serviceLabel, vendorName, city } = useScopedLookups();
   const backend = useBackend();
   const [tab, setTab] = useState<Tab>('payments');
   const [q, setQ] = useState('');
@@ -29,8 +29,8 @@ export default function Payments() {
     failed: charged.filter((b) => b.payment.status === 'failed').length,
   }), [paid, charged]);
   const wallets = useMemo(
-    () => db.vendors.filter((v) => v.status !== 'pending' && v.status !== 'rejected').map((v) => ({ v, w: computeVendorWallet(v.id, db.bookings, db.payouts) })).sort((a, b) => b.w.balance - a.w.balance),
-    [db],
+    () => db.vendors.filter((v) => v.status !== 'pending' && v.status !== 'rejected').map((v) => ({ v, w: computeVendorWallet(v.id, allDb.bookings, allDb.payouts) })).sort((a, b) => b.w.balance - a.w.balance),
+    [db, allDb],
   );
   const payouts = db.payouts.filter((p) => p.status !== 'settled');
   const settled = db.payouts.filter((p) => p.status === 'settled').sort((a, b) => (b.settledAt ?? '').localeCompare(a.settledAt ?? ''));
@@ -39,7 +39,7 @@ export default function Payments() {
   const error = payout.error ?? updatePayout.error;
 
   return (
-    <Page title="Payments" subtitle="Customer payments, vendor payouts and platform commission." permission="payments">
+    <Page title="Payments" subtitle={city ? `Payments for bookings in ${city}, and payouts to vendors based there.` : 'Customer payments, vendor payouts and platform commission.'} permission="payments" cityFilter>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
         <StatCard label="Collected (incl. GST)" value={formatINRCompact(totals.collected)} icon="cash-outline" tone="success" />
         <StatCard label="Platform commission" value={formatINRCompact(totals.commission)} icon="trending-up-outline" />

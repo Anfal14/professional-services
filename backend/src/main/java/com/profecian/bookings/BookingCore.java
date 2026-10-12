@@ -3,7 +3,6 @@ package com.profecian.bookings;
 import com.profecian.catalog.CatalogRepositories.CategoryRepository;
 import com.profecian.catalog.ServiceCategory;
 import com.profecian.common.ApiException;
-import com.profecian.common.Ids;
 import com.profecian.live.LiveEvents;
 import com.profecian.notifications.Draft;
 import com.profecian.notifications.NotificationService;
@@ -12,6 +11,7 @@ import com.profecian.settings.PlatformSettings;
 import com.profecian.settings.SettingsService;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -75,14 +75,23 @@ public class BookingCore {
       case system -> throw new IllegalStateException("System actor cannot change status");
     }
     b.status = target;
+    // Arriving creates the code the customer reads out; a started job needs no more attempts.
+    if (BookingRules.ARRIVED.equals(target) && b.startCode == null) b.startCode = VendorJobRules.newStartCode();
+    if (BookingRules.ARRIVED.equals(target) || BookingRules.IN_PROGRESS.equals(target)) b.startCodeAttempts = 0;
     event(b, target, actor.name(), note);
   }
 
-  /** Re-derive the price from items, the inspection fee or approved quote, the category's commission and GST. */
+  /**
+   * Re-derive the price from items, the inspection fee or approved quote, and GST. The commission
+   * rate stays the one the booking was placed with (its city's or category's at the time).
+   */
   public void reprice(Booking b) {
     PlatformSettings s = settings.get();
-    ServiceCategory c = categories.findById(b.categoryId).orElse(null);
-    BigDecimal rate = c != null && c.commissionRate != null ? c.commissionRate : s.defaultCommissionRate;
+    BigDecimal rate = b.commissionRate;
+    if (rate == null) {
+      ServiceCategory c = categories.findById(b.categoryId).orElse(null);
+      rate = c != null && c.commissionRate != null ? c.commissionRate : s.defaultCommissionRate;
+    }
     Inspection i = b.inspection;
     BigDecimal approved = i != null && "approved".equals(i.status) && i.quoteAmount != null ? i.quoteAmount : null;
     BigDecimal amount = Pricing.serviceAmount(b.items.stream().map(it -> it.price).toList(), i == null ? null : i.fee, approved);
@@ -101,9 +110,15 @@ public class BookingCore {
   /** Persist + notify in the current transaction; live signal after commit. */
   @Transactional(propagation = Propagation.MANDATORY)
   public Booking commit(Booking b, List<Draft> drafts, String... previousVendorIds) {
+    return commit(b, drafts, Duration.ZERO, previousVendorIds);
+  }
+
+  /** As {@link #commit}, but push / WhatsApp / SMS go out only after `sendAfter` (in-app notifications are immediate). */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public Booking commit(Booking b, List<Draft> drafts, Duration sendAfter, String... previousVendorIds) {
     b.updatedAt = clock.instant();
     Booking saved = bookings.saveAndFlush(b);
-    if (!drafts.isEmpty()) notifications.publish(drafts);
+    if (!drafts.isEmpty()) notifications.publish(drafts, sendAfter);
     live.bookingChanged(saved, previousVendorIds);
     return saved;
   }
@@ -116,19 +131,20 @@ public class BookingCore {
     return b.inspection;
   }
 
-  public void addMessage(Inspection i, String from, String authorName, String text) {
-    i.messages.add(new Inspection.Message(Ids.newId("msg"), from, authorName, text, clock.instant()));
-  }
-
   /** True while the final price is still open (no inspection yet, or a quote waiting for an answer). */
   public static boolean isQuoteOpen(Booking b) {
     return b.inspection != null && ("pending".equals(b.inspection.status) || "quoted".equals(b.inspection.status));
   }
 
-  /** The professional can share a quote / close the inspection only on site, before it is settled. */
+  /** The professional can share a quote / close the inspection only once the service is started, before it is settled. */
   public static boolean canQuote(Booking b) {
-    return b.inspection != null && (BookingRules.ARRIVED.equals(b.status) || BookingRules.IN_PROGRESS.equals(b.status))
+    return b.inspection != null && BookingRules.IN_PROGRESS.equals(b.status)
         && ("pending".equals(b.inspection.status) || "declined".equals(b.inspection.status));
+  }
+
+  /** On a normal booking the professional can quote extra work once the service is started — canQuoteExtraWork in inspection.ts. */
+  public static boolean canQuoteExtraWork(Booking b) {
+    return b.inspection == null && BookingRules.IN_PROGRESS.equals(b.status);
   }
 
   public Clock clock() {

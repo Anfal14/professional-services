@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, View, type ScrollView } from 'react-native';
 import { computeBreakdown, INSPECTION_MAX_PHOTOS, INSPECTION_MIN_DETAILS, isSlotAvailable, isValidPhone, useBackend, useDb } from '@profecian/shared';
-import { PhotoPicker } from '@profecian/ui';
+import { Banner, PhotoPicker } from '@profecian/ui';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
@@ -18,7 +18,7 @@ import { Screen } from '@/components/Screen';
 import { useCustomer } from '@/backend';
 import { useCart } from '@/context/CartContext';
 import { formatFullAddress, useLocation } from '@/context/LocationContext';
-import { groupCart, useCatalog } from '@/data/services';
+import { cartSeenSubtotal, groupCart, useCatalog } from '@/data/services';
 import { useResponsive } from '@/hooks/useResponsive';
 import { colors, createStyles, fonts, radius, shadows, spacing } from '@/theme';
 import type { WebPressableState } from '@/types';
@@ -32,11 +32,11 @@ type Field = 'date' | 'time' | 'address' | 'name' | 'phone';
  */
 export default function CartScreen() {
   const cart = useCart();
-  const { services } = useCatalog();
+  const { allServices } = useCatalog();
   const db = useDb();
   const backend = useBackend();
   const customer = useCustomer();
-  const { selectedAddress } = useLocation();
+  const { selectedAddress, blockedFor, city, cityInfo } = useLocation();
   const { isDesktop } = useResponsive();
   const scrollRef = useRef<ScrollView>(null);
 
@@ -55,7 +55,9 @@ export default function CartScreen() {
   const setDetail = (serviceId: string, patch: Partial<{ description: string; photos: string[] }>) =>
     setDetails((all) => ({ ...all, [serviceId]: { ...detailFor(serviceId), ...patch } }));
 
-  const groups = groupCart(services, cart.items);
+  const groups = groupCart(allServices, cart.items);
+  // The address's city must take bookings and offer every service in the cart.
+  const cityBlock = selectedAddress ? groups.map((g) => blockedFor(g.service)).find(Boolean) ?? null : null;
   const bills = groups.map((g) => {
     const category = db.categories.find((c) => c.id === g.service.id);
     return computeBreakdown(g.subtotal, category?.commissionRate ?? db.settings.defaultCommissionRate, db.settings.taxRate);
@@ -64,6 +66,11 @@ export default function CartScreen() {
   const tax = bills.reduce((s, b) => s + b.tax, 0);
   const total = bills.reduce((s, b) => s + b.total, 0);
   const estimate = groups.some((g) => g.estimate);
+  // Prices follow the city of the visit. If items were added while another city's prices were on
+  // screen and the total is different here, tell the customer instead of changing it silently.
+  const addedIn = [...new Set(cart.items.map((i) => i.city).filter((c): c is string => !!c && c !== cityInfo?.name))];
+  const seenItemTotal = cartSeenSubtotal(db, cart.items, cityInfo);
+  const repriced = cityInfo && addedIn.length && seenItemTotal !== itemTotal ? { from: addedIn.join(' and '), was: seenItemTotal } : null;
 
   if (!groups.length) {
     return (
@@ -84,6 +91,7 @@ export default function CartScreen() {
   if (!time) errors.time = 'Pick a time slot';
   else if (date && !isSlotAvailable(date, time)) errors.time = 'That slot has passed — pick another';
   if (customer && !selectedAddress) errors.address = 'Add or choose the address for the visit';
+  else if (cityBlock) errors.address = cityBlock;
   const detailErrors = Object.fromEntries(
     groups
       .filter((g) => g.notSure && detailFor(g.service.id).description.trim().length < INSPECTION_MIN_DETAILS)
@@ -182,6 +190,15 @@ export default function CartScreen() {
 
         <View style={[styles.layout, isDesktop && styles.layoutRow]}>
           <View style={styles.main}>
+            {repriced && cityInfo ? (
+              <Banner
+                tone="info"
+                icon="pricetags-outline"
+                title={`Prices updated for ${city}`}
+                message={`You added these at ${repriced.from} prices. Prices depend on the city of the visit: in ${city} the item total is ${formatPrice(itemTotal)} (it was ${formatPrice(repriced.was)}).`}
+                action={<Button label="OK" size="sm" variant="secondary" onPress={() => cart.acceptPrices(cityInfo.name)} />}
+              />
+            ) : null}
             {groups.map((g) => (
               <View key={g.service.id} style={styles.group}>
                 <View style={styles.groupHead}>
@@ -255,13 +272,16 @@ export default function CartScreen() {
                   <Button label="Log in to continue" icon="log-in-outline" onPress={() => router.push({ pathname: '/login', params: { next: '/cart' } })} />
                 </View>
               ) : selectedAddress ? (
-                <View style={styles.addressRow}>
-                  <Ionicons name={selectedAddress.label === 'Work' ? 'briefcase' : selectedAddress.label === 'Home' ? 'home' : 'location'} size={20} color={colors.primary} />
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <AppText variant="label">{selectedAddress.label}</AppText>
-                    <AppText variant="small">{formatFullAddress(selectedAddress)}</AppText>
+                <View style={{ gap: spacing.md }}>
+                  <View style={styles.addressRow}>
+                    <Ionicons name={selectedAddress.label === 'Work' ? 'briefcase' : selectedAddress.label === 'Home' ? 'home' : 'location'} size={20} color={colors.primary} />
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <AppText variant="label">{selectedAddress.label}</AppText>
+                      <AppText variant="small">{formatFullAddress(selectedAddress)}</AppText>
+                    </View>
+                    <Button label="Change" size="sm" variant="outline" onPress={() => setAddressOpen(true)} />
                   </View>
-                  <Button label="Change" size="sm" variant="outline" onPress={() => setAddressOpen(true)} />
+                  {cityBlock ? <Banner tone="warning" icon="location-outline" title={cityBlock} message="Choose an address in a city where this is available, or remove it from your cart." /> : null}
                 </View>
               ) : (
                 <View style={{ gap: spacing.sm }}>

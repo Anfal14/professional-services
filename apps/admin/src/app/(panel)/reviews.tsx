@@ -5,12 +5,12 @@ import { View } from 'react-native';
 import { COMPLAINT_STATUS, formatDateTime, REVIEW_STATUS, useAction, useBackend, type ComplaintStatus, type ReviewStatus } from '@profecian/shared';
 import { AppText, Badge, Banner, Button, colors, EmptyState, promptText, spacing, Stars } from '@profecian/ui';
 import { Page, Panel, Tabs } from '@/components/admin';
-import { useLookups } from '@/components/lookups';
+import { useScopedLookups } from '@/components/lookups';
 
 type Tab = 'flagged' | 'all' | 'complaints';
 
 export default function Reviews() {
-  const { db, vendorName, category } = useLookups();
+  const { db, vendorName, category, customer, city } = useScopedLookups();
   const backend = useBackend();
   const [tab, setTab] = useState<Tab>('flagged');
   const [reviewFilter, setReviewFilter] = useState<ReviewStatus | 'any'>('any');
@@ -29,7 +29,7 @@ export default function Reviews() {
   };
 
   return (
-    <Page title="Reviews & complaints" subtitle="Moderate what customers see and resolve service issues." permission="reviews">
+    <Page title="Reviews & complaints" subtitle={city ? `Reviews and complaints for jobs in ${city}.` : 'Moderate what customers see and resolve service issues.'} permission="reviews" cityFilter>
       {setStatus.error || updateComplaint.error ? <Banner tone="danger" icon="alert-circle" title={setStatus.error ?? updateComplaint.error ?? ''} /> : null}
       <Tabs value={tab} onChange={setTab} tabs={[
         { value: 'flagged', label: 'Needs moderation', count: flagged.length },
@@ -75,7 +75,7 @@ export default function Reviews() {
                 <AppText variant="h3" style={{ flex: 1 }}>{c.subject}</AppText>
                 <Badge label={COMPLAINT_STATUS[c.status].label} tone={COMPLAINT_STATUS[c.status].tone} />
               </View>
-              <AppText variant="small">{bookingCode(c.bookingId)} · {db.customers.find((x) => x.id === c.customerId)?.name} · vendor {vendorName(c.vendorId)} · {formatDateTime(c.createdAt)}</AppText>
+              <AppText variant="small">{bookingCode(c.bookingId)} · {customer.get(c.customerId)?.name} · vendor {vendorName(c.vendorId)} · {formatDateTime(c.createdAt)}</AppText>
               <AppText color={colors.text}>{c.message}</AppText>
               {c.resolution ? <Banner tone="success" icon="checkmark-circle" title="Resolution" message={c.resolution} /> : null}
               <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
